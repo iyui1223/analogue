@@ -1,0 +1,49 @@
+# =============================================================================
+# Extreme Events Definition
+# User should define events to analyze here
+# =============================================================================
+
+events:
+  # Example event 1: European Heatwave 2023
+  - name: "europe_heatwave_2023"
+    description: "July 2023 European heatwave"
+    
+    # Event time window
+    start_date: "2023-07-15"
+    end_date: "2023-07-20"
+    
+    # Spatial domain for analogue matching (lat-lon bounding box)
+    region:
+      lat_min: 35.0
+      lat_max: 60.0
+      lon_min: -15.0
+      lon_max: 30.0
+    
+    # Urban areas for detailed analysis (optional)
+    urban_areas:
+      - name: "London"
+        lat_min: 51.3
+        lat_max: 51.7
+        lon_min: -0.5
+        lon_max: 0.3
+      - name: "Paris"
+        lat_min: 48.7
+        lat_max: 49.0
+        lon_min: 2.2
+        lon_max: 2.5
+      - name: "Madrid"
+        lat_min: 40.3
+        lat_max: 40.5
+        lon_min: -3.8
+        lon_max: -3.6
+
+  # Example event 2: Add more events as needed
+  # - name: "another_event"
+  #   description: "Description"
+  #   start_date: "YYYY-MM-DD"
+  #   end_date: "YYYY-MM-DD"
+  #   region:
+  #     lat_min: 
+  #     lat_max: 
+  #     lon_min: 
+  #     lon_max: 

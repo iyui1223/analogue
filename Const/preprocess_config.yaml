@@ -1,0 +1,35 @@
+# =============================================================================
+# Preprocessing Configuration
+# =============================================================================
+
+# Climatology calculation period
+climatology:
+  start_year: 1979
+  end_year: 2022
+
+# Variables configuration
+variables:
+  # Variables that need anomaly calculation (climatology subtracted)
+  anomaly_vars:
+    - name: pres
+      mswx_pattern: "Pres_{date}.nc"  # Pattern for daily files, {date} = YYYYMMDD
+      nc_varname: "pres"              # Variable name inside netCDF
+    - name: t2m
+      mswx_pattern: "Tair_{date}.nc"
+      nc_varname: "air_temperature"
+  
+  # Variables kept as raw (no anomaly calculation)
+  raw_vars:
+    - name: precip
+      mswx_pattern: "Prec_{date}.nc"
+      nc_varname: "precipitation"
+    - name: wind10m
+      mswx_pattern: "Wind_{date}.nc"
+      nc_varname: "wind_speed"
+
+# Processing flags - set to false to force recomputation
+skip_existing:
+  climatology: true    # Skip if climatology file exists
+  anomaly: true        # Skip if anomaly file exists
+  yearly_merge: true   # Skip if yearly merged file exists
+  event_bbox: true     # Skip if event bbox file exists

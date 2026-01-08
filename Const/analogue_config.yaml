@@ -1,0 +1,27 @@
+# =============================================================================
+# Analogue Search Configuration
+# =============================================================================
+
+# Number of analogues to select per period
+n_analogues: 15
+
+# Time period definitions for analogue search
+periods:
+  past:
+    start_year: 1979
+    end_year: 2000
+  present:
+    start_year: 2001
+    end_year: 2022
+
+# Time-window smoothing for multi-day events
+# Applied via CDO runmean before analogue search
+smoothing:
+  window_days: 5  # N-day running mean (set to 1 for no smoothing)
+
+# Distance calculation settings
+distance:
+  # Variable used for analogue matching
+  match_variable: "pres"
+  # Latitude weighting: cos(lat) weights for area-representative distance
+  latitude_weighted: true
