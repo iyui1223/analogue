@@ -193,7 +193,8 @@ def find_analogues(
     
     # Select event time window and compute mean
     event_mask = (data_var.time >= event_start) & (data_var.time <= event_end)
-    reference = data_var.where(event_mask, drop=True).mean(dim='time')
+    reference = data_var.where(event_mask, drop=True).mean(dim='time') # !!! better make a snapshot than mean -- should be defined within the .yaml file along with the start/end dates.
+
     
     if verbose:
         print(f"Reference pattern shape: {reference.shape}")
@@ -233,16 +234,68 @@ def find_analogues(
     if verbose:
         print(f"\nPast candidates: {past_mask.sum()}")
         print(f"Present candidates (excl. event): {present_mask.sum()}")
+
+    def select_time_filtered_events(df, n_analogues,
+                                start_col="start_time", end_col="end_time",
+                                distance_col="distance",
+                                buffer=pd.Timedelta("0D")):
+        """
+        Select up to n_analogues events with [start, end] intervals.
+        We keep an event only if its interval does not overlap
+        with any already chosen interval expanded by `buffer` on each side.
+        """
     
-    # Select top N analogues for each period
-    past_df = all_distances[past_mask].nsmallest(n_analogues, 'distance').copy()
-    past_df['rank'] = range(1, len(past_df) + 1)
-    past_df['period'] = 'past'
+        df_sorted = df.sort_values(distance_col).reset_index(drop=False)
     
-    present_df = all_distances[present_mask].nsmallest(n_analogues, 'distance').copy()
-    present_df['rank'] = range(1, len(present_df) + 1)
-    present_df['period'] = 'present'
+        chosen_idx = []
+        chosen_intervals = []  # list of (start, end) tuples
     
+        for _, row in df_sorted.iterrows():
+            s = row[start_col] - buffer
+            e = row[end_col] + buffer
+    
+            # Check if this interval overlaps any chosen interval
+            overlaps = False
+            for cs, ce in chosen_intervals:
+                # No overlap if e < cs or s > ce
+                if not (e < cs or s > ce):
+                    overlaps = True
+                    break
+    
+            if not overlaps:
+                chosen_idx.append(row["index"])
+                chosen_intervals.append((s, e))
+    
+                if len(chosen_idx) >= n_analogues:
+                    break
+    
+        result = df.loc[chosen_idx].copy()
+        result = result.sort_values(distance_col)
+        result["rank"] = np.arange(1, len(result) + 1)
+    
+        return result
+
+    # Past
+    past_candidates = all_distances[past_mask]
+    past_df = select_time_filtered_analogues(
+        past_candidates,
+        n_analogues=n_analogues,
+        time_col="date_time",          # or whatever your column is called
+        distance_col="distance",
+        min_separation=pd.Timedelta("5D")  # or whatever your decorrelation time is
+    )
+    past_df["period"] = "past"
+    
+    # Present
+    present_candidates = all_distances[present_mask]
+    present_df = select_time_filtered_analogues(
+        present_candidates,
+        n_analogues=n_analogues,
+        time_col="date_time",
+        distance_col="distance",
+        min_separation=pd.Timedelta("5D")
+    )
+    present_df["period"] = "present"
     if verbose:
         print(f"\n--- Top {n_analogues} Past Analogues ---")
         print(past_df[['rank', 'date', 'distance']].to_string(index=False))
