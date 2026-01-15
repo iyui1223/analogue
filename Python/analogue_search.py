@@ -35,9 +35,7 @@ from data_utils import (
 
 def compute_latitude_weights(lat: xr.DataArray) -> xr.DataArray:
     """
-    Compute latitude weights for area-representative averaging.
-    
-    Weights are proportional to cos(lat), normalized to sum to 1.
+    Compute latitude weights proportional to cos(lat).
     
     Parameters
     ----------
@@ -47,11 +45,9 @@ def compute_latitude_weights(lat: xr.DataArray) -> xr.DataArray:
     Returns
     -------
     xr.DataArray
-        Normalized latitude weights
+        Latitude weights
     """
-    weights = np.cos(np.deg2rad(lat))
-    weights = weights / weights.sum()
-    return weights
+    return np.cos(np.deg2rad(lat))
 
 
 def compute_euclidean_distances(
@@ -65,7 +61,7 @@ def compute_euclidean_distances(
     Distance formula:
         d(t) = sqrt( sum_ij( w_j * (data(t,i,j) - ref(i,j))^2 ) )
     
-    where w_j = cos(lat_j) / sum(cos(lat))
+    where w_j = cos(lat_j)
     
     Parameters
     ----------
