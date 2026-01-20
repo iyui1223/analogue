@@ -4,22 +4,57 @@
 # =============================================================================
 
 events:
-  # Example event 1: European Heatwave 2023
+  # -------------------------------------------------------------------------
+  # Antarctic Events (Ichikawa et al. study)
+  # -------------------------------------------------------------------------
+  
+  # February 2020 Antarctic Peninsula heatwave
+  - name: "antarctica_peninsula_2020"
+    description: "February 2020 Antarctic Peninsula heatwave"
+    start_date: "2020-02-04"
+    end_date: "2020-02-08"
+    region:
+      lat_min: -70.0
+      lat_max: -60.0
+      lon_min: -70.0
+      lon_max: -55.0
+
+  # March 2022 East Antarctica warm anomaly
+  - name: "east_antarctica_2022"
+    description: "March 2022 East Antarctica warm anomaly"
+    start_date: "2022-03-15"
+    end_date: "2022-03-20"
+    region:
+      lat_min: -80.0
+      lat_max: -65.0
+      lon_min: 80.0
+      lon_max: 150.0
+
+  # March 2015 Peninsula warm spell
+  - name: "antarctica_peninsula_2015"
+    description: "March 2015 Antarctic Peninsula warm spell"
+    start_date: "2015-03-22"
+    end_date: "2015-03-26"
+    region:
+      lat_min: -70.0
+      lat_max: -60.0
+      lon_min: -70.0
+      lon_max: -55.0
+
+  # -------------------------------------------------------------------------
+  # European Events (example/reference)
+  # -------------------------------------------------------------------------
+  
+  # European Heatwave 2023
   - name: "europe_heatwave_2023"
     description: "July 2023 European heatwave"
-    
-    # Event time window
     start_date: "2023-07-15"
     end_date: "2023-07-20"
-    
-    # Spatial domain for analogue matching (lat-lon bounding box)
     region:
       lat_min: 35.0
       lat_max: 60.0
       lon_min: -15.0
       lon_max: 30.0
-    
-    # Urban areas for detailed analysis (optional)
     urban_areas:
       - name: "London"
         lat_min: 51.3
@@ -36,14 +71,3 @@ events:
         lat_max: 40.5
         lon_min: -3.8
         lon_max: -3.6
-
-  # Example event 2: Add more events as needed
-  # - name: "another_event"
-  #   description: "Description"
-  #   start_date: "YYYY-MM-DD"
-  #   end_date: "YYYY-MM-DD"
-  #   region:
-  #     lat_min: 
-  #     lat_max: 
-  #     lon_min: 
-  #     lon_max: 

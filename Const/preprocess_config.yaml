@@ -2,34 +2,87 @@
 # Preprocessing Configuration
 # =============================================================================
 
-# Climatology calculation period
+# -----------------------------------------------------------------------------
+# Reanalysis Data Source Selection
+# -----------------------------------------------------------------------------
+reanalysis:
+  # Active reanalysis: era5, jra3q, mswx
+  active: "era5"
+  
+  # ERA5 configuration
+  era5:
+    enabled: true
+    variables:
+      circulation:
+        - name: z500
+          file_pattern: "z500_{date}.nc"
+          nc_varname: "z"
+          level: 500
+        - name: msl
+          file_pattern: "msl_{date}.nc"
+          nc_varname: "msl"
+        - name: u850
+          file_pattern: "u850_{date}.nc"
+          nc_varname: "u"
+          level: 850
+        - name: v850
+          file_pattern: "v850_{date}.nc"
+          nc_varname: "v"
+          level: 850
+      temperature:
+        - name: t2m
+          file_pattern: "t2m_{date}.nc"
+          nc_varname: "t2m"
+  
+  # JRA-3Q configuration (for robustness testing - future use)
+  jra3q:
+    enabled: false
+    variables:
+      circulation:
+        - name: z500
+          file_pattern: "anl_p125.007_hgt.{date}.nc"
+          nc_varname: "HGT_GDS0_ISBL"
+          level: 500
+        - name: msl
+          file_pattern: "anl_surf125.002_prmsl.{date}.nc"
+          nc_varname: "PRMSL_GDS0_MSL"
+      temperature:
+        - name: t2m
+          file_pattern: "anl_surf125.011_tmp.{date}.nc"
+          nc_varname: "TMP_GDS0_HTGL"
+  
+  # MSWX configuration (retained for future use)
+  mswx:
+    enabled: false
+    variables:
+      anomaly_vars:
+        - name: pres
+          file_pattern: "Pres_{date}.nc"
+          nc_varname: "pres"
+        - name: t2m
+          file_pattern: "Tair_{date}.nc"
+          nc_varname: "air_temperature"
+      raw_vars:
+        - name: precip
+          file_pattern: "Prec_{date}.nc"
+          nc_varname: "precipitation"
+        - name: wind10m
+          file_pattern: "Wind_{date}.nc"
+          nc_varname: "wind_speed"
+
+# -----------------------------------------------------------------------------
+# Climatology Configuration
+# -----------------------------------------------------------------------------
 climatology:
   start_year: 1979
   end_year: 2022
 
-# Variables configuration
-variables:
-  # Variables that need anomaly calculation (climatology subtracted)
-  anomaly_vars:
-    - name: pres
-      mswx_pattern: "Pres_{date}.nc"  # Pattern for daily files, {date} = YYYYMMDD
-      nc_varname: "pres"              # Variable name inside netCDF
-    - name: t2m
-      mswx_pattern: "Tair_{date}.nc"
-      nc_varname: "air_temperature"
-  
-  # Variables kept as raw (no anomaly calculation)
-  raw_vars:
-    - name: precip
-      mswx_pattern: "Prec_{date}.nc"
-      nc_varname: "precipitation"
-    - name: wind10m
-      mswx_pattern: "Wind_{date}.nc"
-      nc_varname: "wind_speed"
-
-# Processing flags - set to false to force recomputation
+# -----------------------------------------------------------------------------
+# Processing Flags
+# -----------------------------------------------------------------------------
+# Set to false to force recomputation
 skip_existing:
-  climatology: true    # Skip if climatology file exists
-  anomaly: true        # Skip if anomaly file exists
-  yearly_merge: true   # Skip if yearly merged file exists
-  event_bbox: true     # Skip if event bbox file exists
+  climatology: true
+  anomaly: true
+  yearly_merge: true
+  event_bbox: true

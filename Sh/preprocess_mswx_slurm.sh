@@ -1,8 +1,9 @@
 #!/bin/bash
-#SBATCH --job-name=F01_preprocess
-#SBATCH --output=Log/F01_preprocess.out
-#SBATCH --error=Log/F01_preprocess.err
+#SBATCH --job-name=preprocess_mswx
+#SBATCH --output=../Log/preprocess_mswx.out
+#SBATCH --error=../Log/preprocess_mswx.err
 #SBATCH --partition=icelake
+#SBATCH --account=CRANMER-SL3-CPU
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
@@ -10,15 +11,17 @@
 #SBATCH --time=12:00:00
 
 # =============================================================================
-# F01: Preprocessing Pipeline
+# MSWX Preprocessing Pipeline
 # =============================================================================
-# This script performs:
+# This script processes MSWX reanalysis data:
 #   1. Merge daily MSWX files -> yearly files (all 4 variables)
 #   2. Compute daily climatology (for pres, t2m only)
 #   3. Compute anomalies = data - climatology (for pres, t2m only)
 #   4. Extract event bounding boxes and apply smoothing (via Python)
 #
 # All steps are conditional: skip if output already exists.
+#
+# MSWX file structure: ${MSWX_DIR}/${VAR}/${VAR}_YYYYMMDD.nc
 # =============================================================================
 
 set -e  # Exit on error
@@ -26,45 +29,50 @@ set -e  # Exit on error
 # -----------------------------------------------------------------------------
 # Load environment settings
 # -----------------------------------------------------------------------------
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
-
+ROOT_DIR="/home/yi260/rds/hpc-work/analogue"
 source "${ROOT_DIR}/Const/env_setting.sh"
 
-# Activate Python environment
-eval "$PYTHON_ENV_CMD"
+# Load CDO module
+module load cdo/2.0.5 2>/dev/null || module load cdo 2>/dev/null || echo "Warning: CDO module not found"
 
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
-# Input: Daily MSWX files
-# Output directories
-YEARLY_DIR="${DATA_DIR}/F01_preprocess/yearly"
-CLIM_DIR="${DATA_DIR}/F01_preprocess/climatology"
-ANOM_DIR="${DATA_DIR}/F01_preprocess/anomaly"
+DATASET="mswx"
+YEARLY_DIR="${DATA_DIR}/F01_preprocess/${DATASET}/yearly"
+CLIM_DIR="${DATA_DIR}/F01_preprocess/${DATASET}/climatology"
+ANOM_DIR="${DATA_DIR}/F01_preprocess/${DATASET}/anomaly"
 
 mkdir -p "$YEARLY_DIR" "$CLIM_DIR" "$ANOM_DIR"
 
-# Variable configurations
-# Format: "internal_name:mswx_prefix:nc_varname"
-# The MSWX files are assumed to be: ${MSWX_DIR}/${mswx_prefix}/${mswx_prefix}_YYYYMMDD.nc
-# Adjust patterns as needed for your MSWX data structure
-
+# Variable configurations for MSWX
+# Format: internal_name -> MSWX prefix
+# MSWX files: ${MSWX_DIR}/${prefix}/${prefix}_YYYYMMDD.nc
 declare -A VAR_CONFIG
 VAR_CONFIG[pres]="Pres"      # MSWX surface pressure
 VAR_CONFIG[t2m]="Tair"       # MSWX 2m air temperature  
 VAR_CONFIG[precip]="Prec"    # MSWX precipitation
 VAR_CONFIG[wind10m]="Wind"   # MSWX 10m wind speed
 
+# All variables to process
+VARS_ALL="pres t2m precip wind10m"
+
 # Variables that need anomaly calculation
 VARS_NEED_ANOMALY="pres t2m"
 
+# Year range (from env_setting.sh or defaults)
+START_YEAR="${START_YEAR:-1979}"
+END_YEAR="${END_YEAR:-2022}"
+
 echo "============================================================"
-echo "F01: Preprocessing Pipeline"
+echo "MSWX Preprocessing Pipeline"
 echo "============================================================"
+echo "Dataset: MSWX"
 echo "ROOT_DIR: $ROOT_DIR"
 echo "MSWX_DIR: $MSWX_DIR"
 echo "Year range: $START_YEAR - $END_YEAR"
+echo "Variables: $VARS_ALL"
+echo "Anomaly vars: $VARS_NEED_ANOMALY"
 echo "============================================================"
 
 # -----------------------------------------------------------------------------
@@ -93,11 +101,7 @@ for var in $VARS_ALL; do
         echo "[${var}] Year ${year}: merging daily files..."
         
         # Find daily files for this year
-        # Adjust this pattern to match your MSWX directory structure
-        # Common structures:
-        #   ${MSWX_DIR}/${mswx_prefix}/${mswx_prefix}_YYYYMMDD.nc
-        #   ${MSWX_DIR}/${mswx_prefix}/YYYY/${mswx_prefix}_YYYYMMDD.nc
-        
+        # Pattern: ${MSWX_DIR}/${mswx_prefix}/${mswx_prefix}_YYYYMMDD.nc
         input_pattern="${MSWX_DIR}/${mswx_prefix}/${mswx_prefix}_${year}????.nc"
         
         # Check if files exist
@@ -105,7 +109,7 @@ for var in $VARS_ALL; do
         
         if [ "$file_count" -eq 0 ]; then
             echo "[${var}] Warning: No files found for ${year} with pattern: ${input_pattern}"
-            # Try alternative pattern
+            # Try alternative pattern (flat structure)
             input_pattern="${MSWX_DIR}/${mswx_prefix}_${year}????.nc"
             file_count=$(ls ${input_pattern} 2>/dev/null | wc -l)
             
@@ -229,7 +233,7 @@ echo "Step 4: Extracting event bounding boxes"
 echo "============================================================"
 
 cd "$ROOT_DIR"
-python Python/preprocess.py --extract-bbox
+python Python/preprocess.py --extract-bbox --dataset mswx
 
 if [ $? -eq 0 ]; then
     echo "Event bbox extraction completed successfully"
@@ -243,10 +247,10 @@ fi
 # -----------------------------------------------------------------------------
 echo ""
 echo "============================================================"
-echo "F01 Preprocessing Complete"
+echo "MSWX Preprocessing Complete"
 echo "============================================================"
 echo "Yearly files:    ${YEARLY_DIR}"
 echo "Climatology:     ${CLIM_DIR}"
 echo "Anomalies:       ${ANOM_DIR}"
-echo "Event data:      ${DATA_DIR}/F01_preprocess/events/"
+echo "Event data:      ${DATA_DIR}/F01_preprocess/${DATASET}/events/"
 echo "============================================================"

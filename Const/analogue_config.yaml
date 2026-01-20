@@ -2,17 +2,24 @@
 # Analogue Search Configuration
 # =============================================================================
 
-# Number of analogues to select per period
+# Number of analogues to select per target day
 n_analogues: 15
 
+# Similarity metric: rmse, correlation
+similarity_metric: "rmse"
+
+# Domain for circulation pattern matching
+circulation_domain: "southern_hemisphere"
+
 # Time period definitions for analogue search
+# NOTE: Test configuration for 1940-1943 ERA5 subset
 periods:
   past:
-    start_year: 1979
-    end_year: 2000
+    start_year: 1940
+    end_year: 1941
   present:
-    start_year: 2001
-    end_year: 2022
+    start_year: 1942
+    end_year: 1943
 
 # Time-window smoothing for multi-day events
 # Applied via CDO runmean before analogue search
@@ -22,6 +29,13 @@ smoothing:
 # Distance calculation settings
 distance:
   # Variable used for analogue matching
-  match_variable: "pres"
+  # NOTE: Using psurf (t2m from ERA5) for testing
+  match_variable: psurf
   # Latitude weighting: cos(lat) weights for area-representative distance
   latitude_weighted: true
+
+# Test mode for development (use limited time range)
+test_mode:
+  enabled: true
+  start_year: 2015
+  end_year: 2022
