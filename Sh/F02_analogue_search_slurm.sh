@@ -39,10 +39,13 @@ ROOT_DIR="/home/yi260/rds/hpc-work/analogue"
 source "${ROOT_DIR}/Const/env_setting.sh"
 
 # -----------------------------------------------------------------------------
-# Dataset selection
-# Can be overridden via environment variable: DATASET=mswx sbatch ...
+# Dataset and Event selection
+# Can be overridden via environment variable:
+#   DATASET=mswx sbatch ...
+#   EVENT=east_antarctica_2022 sbatch ...
 # -----------------------------------------------------------------------------
 DATASET="${DATASET:-era5}"
+EVENT="${EVENT:-antarctica_peninsula_2020}"
 
 # Validate dataset
 case "$DATASET" in
@@ -59,6 +62,7 @@ echo "F02: Analogue Search"
 echo "============================================================"
 echo "ROOT_DIR: $ROOT_DIR"
 echo "Dataset: $DATASET"
+echo "Event: $EVENT"
 echo "============================================================"
 
 # -----------------------------------------------------------------------------
@@ -92,7 +96,7 @@ echo "Starting analogue search..."
 echo ""
 
 cd "$ROOT_DIR"
-python Python/analogue_search.py --dataset "$DATASET" --all --force
+poetry run python3 Python/analogue_search.py --dataset "$DATASET" --event "$EVENT" --force
 
 if [ $? -eq 0 ]; then
     echo ""
@@ -100,10 +104,11 @@ if [ $? -eq 0 ]; then
     echo "F02 Analogue Search Complete"
     echo "============================================================"
     echo "Dataset: $DATASET"
-    echo "Results saved to: ${DATA_DIR}/F02_analogue_search/${DATASET}/"
+    echo "Event: $EVENT"
+    echo "Results saved to: ${DATA_DIR}/F02_analogue_search/${DATASET}/${EVENT}/"
     echo ""
     echo "Output files:"
-    ls -la "${DATA_DIR}/F02_analogue_search/${DATASET}/" 2>/dev/null || echo "  (directory listing failed)"
+    ls -la "${DATA_DIR}/F02_analogue_search/${DATASET}/${EVENT}/" 2>/dev/null || echo "  (directory listing failed)"
     echo "============================================================"
 else
     echo "ERROR in analogue search"

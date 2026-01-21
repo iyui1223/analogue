@@ -17,6 +17,7 @@ Usage:
 
 import argparse
 import sys
+import json
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 from datetime import datetime
@@ -32,6 +33,23 @@ from data_utils import (
     get_data_paths,
     ensure_dir,
 )
+
+# #region agent log - Debug logging helper
+DEBUG_LOG = Path("/home/yi260/rds/hpc-work/analogue/.cursor/debug.log")
+
+def debug_log(hypothesis_id: str, location: str, message: str, data: dict):
+    """Append debug log entry to NDJSON file."""
+    import time
+    entry = {
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time())
+    }
+    with open(DEBUG_LOG, 'a') as f:
+        f.write(json.dumps(entry) + '\n')
+# #endregion
 
 
 def compute_latitude_weights(lat: xr.DataArray) -> xr.DataArray:
@@ -334,6 +352,18 @@ def find_analogues(
     present_start = present_period.get('start_year')
     present_end = present_period.get('end_year')
     
+    # #region agent log - H1: Verify period configuration loaded correctly
+    debug_log("H1", "analogue_search.py:find_analogues", "Period config loaded", {
+        "event_name": event_name,
+        "match_var": match_var,
+        "past_start": past_start,
+        "past_end": past_end,
+        "present_start": present_start,
+        "present_end": present_end,
+        "snapshot_date": str(snapshot_date)
+    })
+    # #endregion
+    
     # Time separation for analogue selection
     smoothing_days = analogue_config.get('smoothing', {}).get('window_days', 5)
     min_separation = pd.Timedelta(days=smoothing_days)
@@ -362,6 +392,16 @@ def find_analogues(
         region=region,
         verbose=verbose
     )
+    
+    # #region agent log - H2: Verify data loaded and time range
+    time_values = pd.to_datetime(data_var.time.values)
+    debug_log("H2", "analogue_search.py:find_analogues", "Data loaded", {
+        "n_timesteps": len(data_var.time),
+        "time_min": str(time_values.min()),
+        "time_max": str(time_values.max()),
+        "data_shape": str(dict(data_var.sizes))
+    })
+    # #endregion
     
     # Get reference pattern from snapshot date
     if verbose:
@@ -434,6 +474,18 @@ def find_analogues(
         min_separation=min_separation
     )
     present_df['period'] = 'present'
+    
+    # #region agent log - H3: Verify analogue selection results
+    debug_log("H3", "analogue_search.py:find_analogues", "Analogues selected", {
+        "event_name": event_name,
+        "past_candidates_count": int(past_mask.sum()),
+        "present_candidates_count": int(present_mask.sum()),
+        "past_analogues_found": len(past_df),
+        "present_analogues_found": len(present_df),
+        "top_past_date": str(past_df['date'].iloc[0]) if len(past_df) > 0 else None,
+        "top_present_date": str(present_df['date'].iloc[0]) if len(present_df) > 0 else None
+    })
+    # #endregion
     
     if verbose:
         print(f"\n--- Top {len(past_df)} Past Analogues ---")

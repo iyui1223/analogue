@@ -23,6 +23,7 @@ events:
     description: "March 2022 East Antarctica warm anomaly"
     start_date: "2022-03-15"
     end_date: "2022-03-20"
+    snapshot_date: "2022-03-18"
     region:
       lat_min: -80.0
       lat_max: -65.0

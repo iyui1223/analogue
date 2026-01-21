@@ -49,15 +49,28 @@ mkdir -p "$YEARLY_DIR" "$CLIM_DIR" "$ANOM_DIR"
 # ERA5 data paths
 ERA5_PSURF_DIR="${ERA5_DIR}/Psurf/daily"
 
-# Variable configurations for ERA5
+# -----------------------------------------------------------------------------
+# Variable Configuration for ERA5
+# -----------------------------------------------------------------------------
+# Map variable names to their netCDF variable names
+declare -A VAR_CONFIG
+VAR_CONFIG[psurf]="sp"  # ERA5 surface pressure
+
+# Variables to process (focus on psurf only for now)
+VARS_ALL="psurf"
 VARS_NEED_ANOMALY="psurf"
+
+# #region agent log - H1: Verify VAR_CONFIG is properly declared
+DEBUG_LOG="/home/yi260/rds/hpc-work/analogue/.cursor/debug.log"
+echo "{\"hypothesisId\":\"H1\",\"location\":\"preprocess_era5_slurm.sh:config\",\"message\":\"VAR_CONFIG check\",\"data\":{\"VAR_CONFIG_psurf\":\"${VAR_CONFIG[psurf]}\",\"VARS_ALL\":\"${VARS_ALL}\"},\"timestamp\":$(date +%s)}" >> "$DEBUG_LOG"
+# #endregion
 
 # =============================================================================
 # TEST MODE: Override year range for small-scale testing
 # Comment out these lines to use full year range from env_setting.sh
 # =============================================================================
-START_YEAR=1940
-END_YEAR=1943
+START_YEAR=2018
+END_YEAR=2023
 # =============================================================================
 
 echo "============================================================"
@@ -69,6 +82,10 @@ echo "ERA5_PSURF_DIR: $ERA5_PSURF_DIR"
 echo "Year range: $START_YEAR - $END_YEAR"
 echo "Variables: $VARS_ALL"
 echo "============================================================"
+
+# #region agent log - H2: Log ERA5 paths before directory check
+echo "{\"hypothesisId\":\"H2\",\"location\":\"preprocess_era5_slurm.sh:paths\",\"message\":\"Path verification\",\"data\":{\"ERA5_DIR\":\"${ERA5_DIR}\",\"ERA5_PSURF_DIR\":\"${ERA5_PSURF_DIR}\",\"DATA_DIR\":\"${DATA_DIR}\",\"YEARLY_DIR\":\"${YEARLY_DIR}\"},\"timestamp\":$(date +%s)}" >> "$DEBUG_LOG"
+# #endregion
 
 # Check if ERA5 directory exists
 if [ ! -d "$ERA5_PSURF_DIR" ]; then
@@ -87,6 +104,10 @@ echo "============================================================"
 
 for var in $VARS_ALL; do
     nc_varname="${VAR_CONFIG[$var]}"
+    
+    # #region agent log - H1: Log VAR_CONFIG lookup result in loop
+    echo "{\"hypothesisId\":\"H1\",\"location\":\"preprocess_era5_slurm.sh:step1_loop\",\"message\":\"VAR_CONFIG lookup\",\"data\":{\"var\":\"${var}\",\"nc_varname\":\"${nc_varname}\",\"is_empty\":\"$([ -z \"$nc_varname\" ] && echo 'true' || echo 'false')\"},\"timestamp\":$(date +%s)}" >> "$DEBUG_LOG"
+    # #endregion
     
     echo ""
     echo "[${var}] NC variable: ${nc_varname}"
@@ -240,7 +261,7 @@ echo "[INFO] Python event bbox extraction is skipped during testing."
 echo "[INFO] Uncomment Step 4 in the script when ready for full processing."
 
 # cd "$ROOT_DIR"
-# python Python/preprocess.py --extract-bbox --dataset era5
+# poetry run python3 Python/preprocess.py --extract-bbox --dataset era5
 # 
 # if [ $? -eq 0 ]; then
 #     echo "Event bbox extraction completed successfully"
@@ -265,3 +286,10 @@ ls -lh "${YEARLY_DIR}"/*.nc 2>/dev/null || echo "  No yearly files found"
 ls -lh "${CLIM_DIR}"/*.nc 2>/dev/null || echo "  No climatology files found"
 ls -lh "${ANOM_DIR}"/*.nc 2>/dev/null || echo "  No anomaly files found"
 echo "============================================================"
+
+# #region agent log - H3: Log completion status
+YEARLY_COUNT=$(ls "${YEARLY_DIR}"/*.nc 2>/dev/null | wc -l)
+CLIM_COUNT=$(ls "${CLIM_DIR}"/*.nc 2>/dev/null | wc -l)
+ANOM_COUNT=$(ls "${ANOM_DIR}"/*.nc 2>/dev/null | wc -l)
+echo "{\"hypothesisId\":\"H3\",\"location\":\"preprocess_era5_slurm.sh:completion\",\"message\":\"Pipeline completed\",\"data\":{\"yearly_files\":${YEARLY_COUNT},\"clim_files\":${CLIM_COUNT},\"anom_files\":${ANOM_COUNT}},\"timestamp\":$(date +%s)}" >> "$DEBUG_LOG"
+# #endregion

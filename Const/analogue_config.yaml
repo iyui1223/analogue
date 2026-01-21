@@ -12,14 +12,14 @@ similarity_metric: "rmse"
 circulation_domain: "antarctica_peninsula_2020"
 
 # Time period definitions for analogue search
-# NOTE: Test configuration for 1940-1943 ERA5 subset
+# NOTE: Test configuration for ERA5 2018-2023 subset
 periods:
   past:
-    start_year: 1948
-    end_year: 1986
+    start_year: 2018
+    end_year: 2020
   present:
-    start_year: 1986
-    end_year: 2025
+    start_year: 2021
+    end_year: 2023
 
 # Time-window smoothing for multi-day events
 # Applied via CDO runmean before analogue search
