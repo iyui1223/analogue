@@ -16,27 +16,21 @@ source ~/venvs/c1coursework/bin/activate
 # -----------------------------------------------------------------------------
 # Data Source Directories
 # -----------------------------------------------------------------------------
+# for F01_preprocess
 export ERA5_DIR="/home/yi260/rds/hpc-work/Download/ERA5"
-export ERA5_PSURF_DIR="${ERA5_DIR}/Psurf/daily/work"  # ERA5 surface pressure data
 export JRA3Q_DIR="/path/to/JRA-3Q"  # TODO: Set when available
 export MSWX_DIR="/home/yi260/rds/hpc-work/Download/MSWX_V100/Past"
 
 # -----------------------------------------------------------------------------
 # Year Ranges for Each Dataset
 # -----------------------------------------------------------------------------
-# MSWX year range
-export START_YEAR=1979
-export END_YEAR=2022
-
-# ERA5 year range (data available from 1940)
+export MSWX_START_YEAR=1979
 export ERA5_START_YEAR=1940
-export ERA5_END_YEAR=2022
+export JRA3Q_START_YEAR=1947
 
-# JRA-3Q year range (JRA-3Q available from 1947)
-export JRA3Q_START_YEAR=1958
-export JRA3Q_END_YEAR=2022
+export END_YEAR=2026
 
-# All variables to process (for MSWX)
+# All variables to process
 export VARS_ALL="pres t2m precip wind10m"
 
 # ------------------------------------------------
@@ -60,6 +54,3 @@ mkdir -p "${PROCESSED_DIR}"
 mkdir -p "${LOG_DIR}"
 mkdir -p "${FIGS_DIR}"
 mkdir -p "${RESULTS_DIR}"
-
-# Create symlinks to data sources
-ln -rsf ${ERA5_DIR} ${ROOT_DIR}/Data/ERA5

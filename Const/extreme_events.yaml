@@ -3,21 +3,20 @@
 # User should define events to analyze here
 # =============================================================================
 
-events:
-  # -------------------------------------------------------------------------
-  # Antarctic Events (Ichikawa et al. study)
-  # -------------------------------------------------------------------------
-  
+# TODO: Curate events 
+
+events:  
   # February 2020 Antarctic Peninsula heatwave
   - name: "antarctica_peninsula_2020"
     description: "February 2020 Antarctic Peninsula heatwave"
-    start_date: "2020-02-04"
-    end_date: "2020-02-08"
+    start_date: "2020-02-01"
+    end_date: "2020-02-15"
+    snapshot_date: "2020-02-08"
     region:
-      lat_min: -70.0
-      lat_max: -60.0
-      lon_min: -70.0
-      lon_max: -55.0
+      lat_min: -85.0
+      lat_max: -55.0
+      lon_min: -135.0
+      lon_max: -35.0
 
   # March 2022 East Antarctica warm anomaly
   - name: "east_antarctica_2022"

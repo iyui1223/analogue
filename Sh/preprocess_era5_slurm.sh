@@ -47,18 +47,9 @@ ANOM_DIR="${DATA_DIR}/F01_preprocess/${DATASET}/anomaly"
 mkdir -p "$YEARLY_DIR" "$CLIM_DIR" "$ANOM_DIR"
 
 # ERA5 data paths
-# Psurf directory contains monthly files with t2m variable
-ERA5_PSURF_DIR="${ERA5_PSURF_DIR:-${ERA5_DIR}/Psurf/daily/work}"
+ERA5_PSURF_DIR="${ERA5_DIR}/Psurf/daily"
 
 # Variable configurations for ERA5
-# Using Psurf (surface pressure proxy - actually contains t2m in the files)
-declare -A VAR_CONFIG
-VAR_CONFIG[psurf]="t2m"       # Variable name inside the NetCDF files
-
-# All variables to process
-VARS_ALL="psurf"
-
-# Variables that need anomaly calculation (all for ERA5)
 VARS_NEED_ANOMALY="psurf"
 
 # =============================================================================

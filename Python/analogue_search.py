@@ -185,8 +185,8 @@ def compute_euclidean_distances(
     """
     Compute latitude-weighted Euclidean distance between reference and all time steps.
     
-    Distance formula:
-        d(t) = sqrt( sum_ij( w_j * (data(t,i,j) - ref(i,j))^2 ) )
+    Distance formula: no square root as it is computationally heavy and meaningless
+        d(t) = sum_ij( w_j * (data(t,i,j) - ref(i,j))^2 )
     
     where w_j = cos(lat_j) / sum(cos(lat))
     
@@ -216,10 +216,7 @@ def compute_euclidean_distances(
     # Sum over spatial dimensions
     sum_weighted_sq = weighted_diff_sq.sum(dim=['lat', 'lon'])
     
-    # Square root to get Euclidean distance
-    distances = np.sqrt(sum_weighted_sq)
-    
-    return distances
+    return sum_weighted_sq
 
 
 def select_time_separated_analogues(
@@ -254,6 +251,9 @@ def select_time_separated_analogues(
         Selected analogues with rank column
     """
     # Sort by distance (ascending - smaller is better)
+    # !!! if it takes too long to sort, consider using a more sofisticated sort method
+    # https://leetcode.com/problems/largest-number/solutions/7508028/verrryyy-easssyyy-solution-beats-100-cc-y66we/
+
     df_sorted = df.sort_values(distance_col).reset_index(drop=True)
     
     chosen_indices = []
@@ -329,10 +329,10 @@ def find_analogues(
     past_period = analogue_config.get('periods', {}).get('past', {})
     present_period = analogue_config.get('periods', {}).get('present', {})
     
-    past_start = past_period.get('start_year', 1940)
-    past_end = past_period.get('end_year', 1941)
-    present_start = present_period.get('start_year', 1942)
-    present_end = present_period.get('end_year', 1943)
+    past_start = past_period.get('start_year') # no default values -- better fail than silently assume
+    past_end = past_period.get('end_year')
+    present_start = present_period.get('start_year')
+    present_end = present_period.get('end_year')
     
     # Time separation for analogue selection
     smoothing_days = analogue_config.get('smoothing', {}).get('window_days', 5)
