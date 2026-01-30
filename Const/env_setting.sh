@@ -13,6 +13,9 @@ export ROOT_DIR="/home/yi260/rds/hpc-work/analogue"
 source ~/venvs/c1coursework/bin/activate
 # Note: Use 'poetry run python3' in scripts, or 'poetry shell' for interactive use
 
+# GrADS executable
+export GRADS_CMD="/home/yi260/rds/hpc-work/lib/opengrads/opengrads-2.2.1.oga.1/Contents/grads"
+
 # -----------------------------------------------------------------------------
 # Data Source Directories
 # -----------------------------------------------------------------------------
