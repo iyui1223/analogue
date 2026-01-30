@@ -25,10 +25,18 @@ export MSWX_DIR="/home/yi260/rds/hpc-work/Download/MSWX_V100/Past"
 # Year Ranges for Each Dataset
 # -----------------------------------------------------------------------------
 export MSWX_START_YEAR=1979
-export ERA5_START_YEAR=1940
-export JRA3Q_START_YEAR=1947
+export ERA5_START_YEAR=1948   # Aligned with JRA3Q availability (Jan 1948 onwards)
+export JRA3Q_START_YEAR=1948
 
 export END_YEAR=2026
+
+# -----------------------------------------------------------------------------
+# Past / Present Period Separation (for attribution analysis)
+# -----------------------------------------------------------------------------
+export PAST_START_YEAR=1948
+export PAST_END_YEAR=1987
+export PRESENT_START_YEAR=1988
+export PRESENT_END_YEAR=2026
 
 # All variables to process
 export VARS_ALL="pres t2m precip wind10m"

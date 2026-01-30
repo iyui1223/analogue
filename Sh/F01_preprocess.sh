@@ -22,6 +22,9 @@
 
 set -e
 
+# TODO: It maybe better to use climatology file provided by dataset instead of computing it here?
+# p19 has some description on how it is made for JRA-3Q: https://www.data.jma.go.jp/jra/html/JRA-3Q/document/JRA-3Q_LL125_format_v1_ja.pdf
+
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------

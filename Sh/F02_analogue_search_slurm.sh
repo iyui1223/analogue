@@ -39,13 +39,16 @@ ROOT_DIR="/home/yi260/rds/hpc-work/analogue"
 source "${ROOT_DIR}/Const/env_setting.sh"
 
 # -----------------------------------------------------------------------------
-# Dataset and Event selection
+# Dataset, Event, and Period selection
 # Can be overridden via environment variable:
 #   DATASET=mswx sbatch ...
 #   EVENT=east_antarctica_2022 sbatch ...
+#   PERIOD=past sbatch ...    # Process only past period (1948-1987)
+#   PERIOD=present sbatch ... # Process only present period (1988-2026)
 # -----------------------------------------------------------------------------
 DATASET="${DATASET:-era5}"
 EVENT="${EVENT:-antarctica_peninsula_2020}"
+PERIOD="${PERIOD:-}"  # Empty = process both periods
 
 # Validate dataset
 case "$DATASET" in
@@ -93,10 +96,21 @@ grep -A2 "snapshot_date" "${EVENTS_CONFIG}" | head -10 || echo "  (none found)"
 # -----------------------------------------------------------------------------
 echo ""
 echo "Starting analogue search..."
+if [ -n "$PERIOD" ]; then
+    echo "Period filter: $PERIOD only"
+fi
 echo ""
 
 cd "$ROOT_DIR"
-poetry run python3 Python/analogue_search.py --dataset "$DATASET" --event "$EVENT" --force
+
+# Build command with optional period argument
+CMD="poetry run python3 Python/analogue_search.py --dataset $DATASET --event $EVENT --force"
+if [ -n "$PERIOD" ]; then
+    CMD="$CMD --period $PERIOD"
+fi
+
+echo "Running: $CMD"
+eval $CMD
 
 if [ $? -eq 0 ]; then
     echo ""
@@ -105,6 +119,9 @@ if [ $? -eq 0 ]; then
     echo "============================================================"
     echo "Dataset: $DATASET"
     echo "Event: $EVENT"
+    if [ -n "$PERIOD" ]; then
+        echo "Period: $PERIOD"
+    fi
     echo "Results saved to: ${DATA_DIR}/F02_analogue_search/${DATASET}/${EVENT}/"
     echo ""
     echo "Output files:"

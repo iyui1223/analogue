@@ -13,13 +13,14 @@ circulation_domain: "antarctica_peninsula_2020"
 
 # Time period definitions for analogue search
 # NOTE: Test configuration for ERA5 2018-2023 subset
+# Past/Present period separation for attribution analysis
 periods:
   past:
-    start_year: 2018
-    end_year: 2020
+    start_year: 1948
+    end_year: 1987
   present:
-    start_year: 2021
-    end_year: 2023
+    start_year: 1988
+    end_year: 2026
 
 # Time-window smoothing for multi-day events
 # Applied via CDO runmean before analogue search

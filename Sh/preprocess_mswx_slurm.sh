@@ -233,7 +233,7 @@ echo "Step 4: Extracting event bounding boxes"
 echo "============================================================"
 
 cd "$ROOT_DIR"
-python Python/preprocess.py --extract-bbox --dataset mswx
+poetry run python3 Python/preprocess.py --extract-bbox --dataset mswx
 
 if [ $? -eq 0 ]; then
     echo "Event bbox extraction completed successfully"

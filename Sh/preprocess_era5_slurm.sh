@@ -7,8 +7,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=32G
-#SBATCH --time=01:00:00
+#SBATCH --mem=8G
+#SBATCH --time=12:00:00
 
 # =============================================================================
 # ERA5 Preprocessing Pipeline
@@ -66,11 +66,10 @@ echo "{\"hypothesisId\":\"H1\",\"location\":\"preprocess_era5_slurm.sh:config\",
 # #endregion
 
 # =============================================================================
-# TEST MODE: Override year range for small-scale testing
-# Comment out these lines to use full year range from env_setting.sh
+# Year range from env_setting.sh (1948-2026 for production)
 # =============================================================================
-START_YEAR=2018
-END_YEAR=2023
+START_YEAR=${ERA5_START_YEAR}
+# END_YEAR is already set in env_setting.sh
 # =============================================================================
 
 echo "============================================================"

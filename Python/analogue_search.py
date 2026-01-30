@@ -77,6 +77,7 @@ def load_anomaly_data(
     var: str,
     paths: Dict[str, Path],
     region: Dict[str, float],
+    year_range: Optional[Tuple[int, int]] = None,
     verbose: bool = True
 ) -> xr.DataArray:
     """
@@ -92,6 +93,8 @@ def load_anomaly_data(
         Data paths from get_data_paths()
     region : dict
         Event region with lat_min, lat_max, lon_min, lon_max
+    year_range : tuple, optional
+        (start_year, end_year) to filter files. If None, loads all years.
     verbose : bool
         Print progress messages
         
@@ -111,6 +114,23 @@ def load_anomaly_data(
     
     if not anom_files:
         raise FileNotFoundError(f"No anomaly files found: {anom_dir}/{pattern}")
+    
+    # Filter files by year range if specified
+    if year_range is not None:
+        start_year, end_year = year_range
+        filtered_files = []
+        for f in anom_files:
+            # Extract year from filename: anomaly_psurf_2020.nc -> 2020
+            try:
+                year = int(f.stem.split('_')[-1])
+                if start_year <= year <= end_year:
+                    filtered_files.append(f)
+            except ValueError:
+                continue
+        anom_files = filtered_files
+        
+        if not anom_files:
+            raise FileNotFoundError(f"No anomaly files found for years {start_year}-{end_year}")
     
     if verbose:
         print(f"Found {len(anom_files)} anomaly files for {var}")
@@ -167,6 +187,7 @@ def load_anomaly_data(
         data_var = data_var.rename(rename_dict)
     
     # Slice to event bounding box
+    # NOTE: Use 0-360 longitude convention in extreme_events.yaml to match ERA5
     lat_min = region['lat_min']
     lat_max = region['lat_max']
     lon_min = region['lon_min']
@@ -306,6 +327,7 @@ def find_analogues(
     dataset: str,
     paths: Dict[str, Path],
     analogue_config: Dict[str, Any],
+    period: Optional[str] = None,
     verbose: bool = True
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -321,6 +343,9 @@ def find_analogues(
         Data paths from get_data_paths()
     analogue_config : dict
         Analogue search configuration
+    period : str, optional
+        'past', 'present', or None (both). If specified, only loads/processes
+        that period to save time and memory.
     verbose : bool
         Print progress messages
         
@@ -328,8 +353,8 @@ def find_analogues(
     -------
     Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
         - all_distances: DataFrame with all dates and distances
-        - past_analogues: DataFrame with top N past analogues
-        - present_analogues: DataFrame with top N present analogues
+        - past_analogues: DataFrame with top N past analogues (empty if period='present')
+        - present_analogues: DataFrame with top N present analogues (empty if period='past')
     """
     event_name = event['name']
     region = event['region']
@@ -360,13 +385,22 @@ def find_analogues(
         "past_end": past_end,
         "present_start": present_start,
         "present_end": present_end,
-        "snapshot_date": str(snapshot_date)
+        "snapshot_date": str(snapshot_date),
+        "period_filter": period
     })
     # #endregion
     
     # Time separation for analogue selection
     smoothing_days = analogue_config.get('smoothing', {}).get('window_days', 5)
     min_separation = pd.Timedelta(days=smoothing_days)
+    
+    # Determine year range to load based on period filter
+    if period == 'past':
+        year_range = (past_start, past_end)
+    elif period == 'present':
+        year_range = (present_start, present_end)
+    else:
+        year_range = None  # Load all years
     
     if verbose:
         print(f"\n{'='*60}")
@@ -378,18 +412,23 @@ def find_analogues(
         print(f"Region: lat[{region['lat_min']}, {region['lat_max']}], lon[{region['lon_min']}, {region['lon_max']}]")
         print(f"Past period: {past_start}-{past_end}")
         print(f"Present period: {present_start}-{present_end}")
+        if period:
+            print(f"Processing ONLY: {period} period")
         print(f"N analogues: {n_analogues}")
         print(f"Min time separation: {min_separation}")
     
     # Load anomaly data sliced to event region
     if verbose:
         print(f"\nLoading anomaly data...")
+        if year_range:
+            print(f"  Year range filter: {year_range[0]}-{year_range[1]}")
     
     data_var = load_anomaly_data(
         dataset=dataset,
         var=match_var,
         paths=paths,
         region=region,
+        year_range=year_range,
         verbose=verbose
     )
     
@@ -404,11 +443,30 @@ def find_analogues(
     # #endregion
     
     # Get reference pattern from snapshot date
+    # If snapshot year is not in loaded data (e.g., processing past but snapshot is in present),
+    # load the reference separately
+    snapshot_year = snapshot_date.year
+    
     if verbose:
         print(f"\nExtracting reference pattern for {snapshot_date.strftime('%Y-%m-%d')}...")
     
-    reference = data_var.sel(time=snapshot_date, method='nearest')
-    actual_snapshot = pd.Timestamp(reference.time.values)
+    if year_range and not (year_range[0] <= snapshot_year <= year_range[1]):
+        # Snapshot is outside loaded year range - load it separately
+        if verbose:
+            print(f"  Snapshot year {snapshot_year} not in loaded range, loading separately...")
+        ref_data = load_anomaly_data(
+            dataset=dataset,
+            var=match_var,
+            paths=paths,
+            region=region,
+            year_range=(snapshot_year, snapshot_year),
+            verbose=False
+        )
+        reference = ref_data.sel(time=snapshot_date, method='nearest')
+        actual_snapshot = pd.Timestamp(reference.time.values)
+    else:
+        reference = data_var.sel(time=snapshot_date, method='nearest')
+        actual_snapshot = pd.Timestamp(reference.time.values)
     
     if verbose:
         print(f"Actual snapshot date used: {actual_snapshot.strftime('%Y-%m-%d')}")
@@ -420,11 +478,21 @@ def find_analogues(
     # Compute distances to all time steps
     if verbose:
         print(f"\nComputing distances to all {len(data_var.time)} time steps...")
+        print(f"  (This may take a while for large datasets...)")
+        import sys
+        sys.stdout.flush()
     
     distances = compute_euclidean_distances(data_var, reference, lat_weights)
     
-    # Trigger computation (if using dask)
-    distances = distances.compute()
+    # Trigger computation (if using dask) with progress bar
+    if verbose:
+        print(f"  Triggering dask computation...")
+        sys.stdout.flush()
+        from dask.diagnostics import ProgressBar
+        with ProgressBar():
+            distances = distances.compute()
+    else:
+        distances = distances.compute()
     
     if verbose:
         print(f"Distance computation complete.")
@@ -454,26 +522,32 @@ def find_analogues(
         print(f"\nPast candidates: {past_mask.sum()}")
         print(f"Present candidates (excl. snapshot): {present_mask.sum()}")
     
-    # Select top analogues from each period
-    past_candidates = all_distances[past_mask].copy()
-    past_df = select_time_separated_analogues(
-        past_candidates,
-        n_analogues=n_analogues,
-        time_col='date',
-        distance_col='distance',
-        min_separation=min_separation
-    )
-    past_df['period'] = 'past'
+    # Select top analogues from each period (skip if not processing that period)
+    if period != 'present':  # Process past if period is None or 'past'
+        past_candidates = all_distances[past_mask].copy()
+        past_df = select_time_separated_analogues(
+            past_candidates,
+            n_analogues=n_analogues,
+            time_col='date',
+            distance_col='distance',
+            min_separation=min_separation
+        )
+        past_df['period'] = 'past'
+    else:
+        past_df = pd.DataFrame(columns=['date', 'distance', 'year', 'month', 'day', 'rank', 'period'])
     
-    present_candidates = all_distances[present_mask].copy()
-    present_df = select_time_separated_analogues(
-        present_candidates,
-        n_analogues=n_analogues,
-        time_col='date',
-        distance_col='distance',
-        min_separation=min_separation
-    )
-    present_df['period'] = 'present'
+    if period != 'past':  # Process present if period is None or 'present'
+        present_candidates = all_distances[present_mask].copy()
+        present_df = select_time_separated_analogues(
+            present_candidates,
+            n_analogues=n_analogues,
+            time_col='date',
+            distance_col='distance',
+            min_separation=min_separation
+        )
+        present_df['period'] = 'present'
+    else:
+        present_df = pd.DataFrame(columns=['date', 'distance', 'year', 'month', 'day', 'rank', 'period'])
     
     # #region agent log - H3: Verify analogue selection results
     debug_log("H3", "analogue_search.py:find_analogues", "Analogues selected", {
@@ -508,6 +582,7 @@ def process_event(
     dataset: str,
     paths: Dict[str, Path],
     analogue_config: Dict[str, Any],
+    period: Optional[str] = None,
     skip_existing: bool = True,
     verbose: bool = True
 ) -> bool:
@@ -524,6 +599,8 @@ def process_event(
         Data paths
     analogue_config : dict
         Analogue configuration
+    period : str, optional
+        'past', 'present', or None (both)
     skip_existing : bool
         Skip if output exists
     verbose : bool
@@ -539,11 +616,12 @@ def process_event(
     # Output directory includes dataset name
     output_dir = ensure_dir(paths['analogue'] / dataset / event_name)
     
-    # Output files
-    distances_file = output_dir / 'all_distances.csv'
-    past_file = output_dir / 'past_analogues.csv'
-    present_file = output_dir / 'present_analogues.csv'
-    combined_file = output_dir / 'analogues.csv'
+    # Output files - add period suffix if processing single period
+    suffix = f"_{period}" if period else ""
+    distances_file = output_dir / f'all_distances{suffix}.csv'
+    past_file = output_dir / f'past_analogues{suffix}.csv'
+    present_file = output_dir / f'present_analogues{suffix}.csv'
+    combined_file = output_dir / f'analogues{suffix}.csv'
     
     # Check if can skip
     if skip_existing and combined_file.exists():
@@ -558,13 +636,16 @@ def process_event(
             dataset=dataset,
             paths=paths,
             analogue_config=analogue_config,
+            period=period,
             verbose=verbose
         )
         
         # Save results
         all_distances.to_csv(distances_file, index=False)
-        past_df.to_csv(past_file, index=False)
-        present_df.to_csv(present_file, index=False)
+        if not past_df.empty or period != 'present':
+            past_df.to_csv(past_file, index=False)
+        if not present_df.empty or period != 'past':
+            present_df.to_csv(present_file, index=False)
         
         # Combined analogues file
         combined = pd.concat([past_df, present_df], ignore_index=True)
@@ -588,6 +669,7 @@ def process_event(
 
 def process_all_events(
     dataset: str,
+    period: Optional[str] = None,
     skip_existing: bool = True,
     verbose: bool = True
 ) -> bool:
@@ -598,6 +680,8 @@ def process_all_events(
     ----------
     dataset : str
         Dataset name: 'era5', 'mswx', or 'jra3q'
+    period : str, optional
+        'past', 'present', or None (both)
     skip_existing : bool
         Skip if output exists
     verbose : bool
@@ -628,6 +712,8 @@ def process_all_events(
         return False
     
     print(f"\nDataset: {dataset}")
+    if period:
+        print(f"Period: {period}")
     print(f"Processing {len(valid_events)} event(s) for analogue search...")
     
     all_success = True
@@ -637,6 +723,7 @@ def process_all_events(
             dataset=dataset,
             paths=paths,
             analogue_config=analogue_config,
+            period=period,
             skip_existing=skip_existing,
             verbose=verbose
         )
@@ -670,6 +757,13 @@ def main():
         help='Process specific event by name'
     )
     parser.add_argument(
+        '--period',
+        type=str,
+        choices=['past', 'present'],
+        default=None,
+        help='Process only this period (past or present) to save time. If not specified, processes both.'
+    )
+    parser.add_argument(
         '--force',
         action='store_true',
         help='Force recomputation even if output exists'
@@ -689,6 +783,8 @@ def main():
     print("Analogue Search Pipeline")
     print("=" * 60)
     print(f"Dataset: {args.dataset}")
+    if args.period:
+        print(f"Period: {args.period} only")
     
     if args.all or args.event:
         if args.event:
@@ -718,6 +814,7 @@ def main():
                 dataset=args.dataset,
                 paths=paths,
                 analogue_config=analogue_config,
+                period=args.period,
                 skip_existing=skip_existing,
                 verbose=verbose
             )
@@ -725,6 +822,7 @@ def main():
             # Process all events
             success = process_all_events(
                 dataset=args.dataset,
+                period=args.period,
                 skip_existing=skip_existing,
                 verbose=verbose
             )

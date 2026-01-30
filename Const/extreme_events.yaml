@@ -15,8 +15,8 @@ events:
     region:
       lat_min: -85.0
       lat_max: -55.0
-      lon_min: -135.0
-      lon_max: -35.0
+      lon_min: 225.0   # -135 + 360
+      lon_max: 325.0   # -35 + 360
 
   # March 2022 East Antarctica warm anomaly
   - name: "east_antarctica_2022"
@@ -38,8 +38,8 @@ events:
     region:
       lat_min: -70.0
       lat_max: -60.0
-      lon_min: -70.0
-      lon_max: -55.0
+      lon_min: 290.0   # -70 + 360
+      lon_max: 305.0   # -55 + 360
 
   # -------------------------------------------------------------------------
   # European Events (example/reference)
@@ -53,8 +53,8 @@ events:
     region:
       lat_min: 35.0
       lat_max: 60.0
-      lon_min: -15.0
-      lon_max: 30.0
+      lon_min: 345.0   # -15 + 360
+      lon_max: 30.0    # crosses 0 meridian
     urban_areas:
       - name: "London"
         lat_min: 51.3
