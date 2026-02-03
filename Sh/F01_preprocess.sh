@@ -28,7 +28,7 @@ set -e
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
-ROOT_DIR="/home/yi260/rds/hpc-work/analogue"
+ROOT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue"
 SCRIPT_DIR="${ROOT_DIR}/Sh"
 LOG_DIR="${ROOT_DIR}/Log"
 

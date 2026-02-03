@@ -35,7 +35,7 @@ set -e  # Exit on error
 # -----------------------------------------------------------------------------
 # Load environment settings
 # -----------------------------------------------------------------------------
-ROOT_DIR="/home/yi260/rds/hpc-work/analogue"
+ROOT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue"
 source "${ROOT_DIR}/Const/env_setting.sh"
 
 # Load CDO module
@@ -66,7 +66,7 @@ VARS_ALL="psurf"
 VARS_NEED_ANOMALY="psurf"
 
 # #region agent log - H1: Verify VAR_CONFIG is properly declared
-DEBUG_LOG="/home/yi260/rds/hpc-work/analogue/.cursor/debug.log"
+DEBUG_LOG="/lustre/soge1/projects/andante/cenv1201/proj/analogue/.cursor/debug.log"
 echo "{\"hypothesisId\":\"H1\",\"location\":\"preprocess_era5_slurm.sh:config\",\"message\":\"VAR_CONFIG check\",\"data\":{\"VAR_CONFIG_psurf\":\"${VAR_CONFIG[psurf]}\",\"VARS_ALL\":\"${VARS_ALL}\"},\"timestamp\":$(date +%s)}" >> "$DEBUG_LOG"
 # #endregion
 

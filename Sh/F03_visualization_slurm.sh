@@ -1,9 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=F03_visualization
-#SBATCH --output=../Log/F03_visualization.out
-#SBATCH --error=../Log/F03_visualization.err
-#SBATCH --partition=icelake
-#SBATCH --account=CRANMER-SL3-CPU
+#SBATCH --output=/lustre/soge1/projects/andante/cenv1201/proj/analogue/Log/F03_visualization.out
+#SBATCH --error=/lustre/soge1/projects/andante/cenv1201/proj/analogue/Log/F03_visualization.err
+#SBATCH --partition=Short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
@@ -16,7 +15,8 @@
 
 set -eox
 
-ROOT_DIR="/home/yi260/rds/hpc-work/analogue"
+# Use actual lustre path (not symlink) for SLURM compatibility
+ROOT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue"
 source "${ROOT_DIR}/Const/env_setting.sh"
 
 # GrADS is set via GRADS_CMD in env_setting.sh

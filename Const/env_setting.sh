@@ -1,29 +1,32 @@
 #!/bin/bash
 
-module purge
-
 # =============================================================================
 # Environment settings for Antarctic Circulation Analogue Attribution Study
 # =============================================================================
+# Updated for SOGE environment (cenv1201)
+# =============================================================================
 
 # --------------------- EDIT ---------------------
-export ROOT_DIR="/home/yi260/rds/hpc-work/analogue"
+# Use actual lustre path (not symlink) for SLURM compatibility
+export ROOT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue"
 
-# Python environment
-source ~/venvs/c1coursework/bin/activate
+# Python environment (update path as needed)
+# source ~/venvs/c1coursework/bin/activate
 
-module load cdo
-
-# GrADS executable
-export GRADS_CMD="/home/yi260/rds/hpc-work/lib/opengrads/opengrads-2.2.1.oga.1/Contents/grads"
+# GrADS executable (globally available on SOGE)
+export GRADS_CMD="grads"
 
 # -----------------------------------------------------------------------------
-# Data Source Directories
+# Data Source Directories (use lustre paths for SLURM compatibility)
 # -----------------------------------------------------------------------------
-# for F01_preprocess
-export ERA5_DIR="/home/yi260/rds/hpc-work/Download/ERA5"
-export JRA3Q_DIR="/path/to/JRA-3Q"  # TODO: Set when available
-export MSWX_DIR="/home/yi260/rds/hpc-work/Download/MSWX_V100/Past"
+# ERA5 data on SOGE shared storage
+export ERA5_DIR="/lustre/soge1/data/analysis/era5/0.28125x0.28125"
+export ERA5_DAILY="${ERA5_DIR}/daily"
+export ERA5_INVARIANT="${ERA5_DIR}/invariant"
+
+# Other reanalysis datasets (TODO: Set when available)
+export JRA3Q_DIR="/path/to/JRA-3Q"
+export MSWX_DIR="/lustre/soge1/data/analysis/gloh2o-mswx"
 
 # -----------------------------------------------------------------------------
 # Year Ranges for Each Dataset

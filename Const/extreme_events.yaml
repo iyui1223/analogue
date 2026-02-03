@@ -12,6 +12,7 @@ events:
     start_date: "2020-02-01"
     end_date: "2020-02-15"
     snapshot_date: "2020-02-08"
+    projection: "sps"  # South Polar Stereographic for Antarctic events
     region:
       lat_min: -85.0
       lat_max: -55.0
@@ -24,6 +25,7 @@ events:
     start_date: "2022-03-15"
     end_date: "2022-03-20"
     snapshot_date: "2022-03-18"
+    projection: "sps"  # South Polar Stereographic for Antarctic events
     region:
       lat_min: -80.0
       lat_max: -65.0
@@ -35,6 +37,7 @@ events:
     description: "March 2015 Antarctic Peninsula warm spell"
     start_date: "2015-03-22"
     end_date: "2015-03-26"
+    projection: "sps"  # South Polar Stereographic for Antarctic events
     region:
       lat_min: -70.0
       lat_max: -60.0
@@ -50,6 +53,7 @@ events:
     description: "July 2023 European heatwave"
     start_date: "2023-07-15"
     end_date: "2023-07-20"
+    projection: "latlon"  # Standard lat-lon projection for mid-latitude events
     region:
       lat_min: 35.0
       lat_max: 60.0

@@ -34,7 +34,7 @@ set -e  # Exit on error
 # -----------------------------------------------------------------------------
 # Load environment settings (venv with poetry must be activated)
 # -----------------------------------------------------------------------------
-cd /home/yi260/rds/hpc-work/analogue
+cd /lustre/soge1/projects/andante/cenv1201/proj/analogue
 source Const/env_setting.sh
 
 if ! command -v poetry &>/dev/null; then

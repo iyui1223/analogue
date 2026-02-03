@@ -29,7 +29,7 @@ set -e  # Exit on error
 # -----------------------------------------------------------------------------
 # Load environment settings
 # -----------------------------------------------------------------------------
-ROOT_DIR="/home/yi260/rds/hpc-work/analogue"
+ROOT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue"
 source "${ROOT_DIR}/Const/env_setting.sh"
 
 # Load CDO module
