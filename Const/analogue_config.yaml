@@ -35,3 +35,18 @@ distance:
   # Latitude weighting: cos(lat) weights for area-representative distance
   latitude_weighted: true
 
+# Define the calendar date range (month-day) for analogue search
+# This restricts analogue matching to specific seasons (e.g., DJF for Antarctic summer)
+# Use month (1-12) and day (1-31). Leave as null to search all calendar dates.
+# Example: For Dec 1 - Jan 31, use:
+#   start: {month: 12, day: 1}
+#   end: {month: 1, day: 31}
+calendar_date_range:
+  # When null, no calendar restriction is applied
+  start: null  # {month: 12, day: 1}
+  end: null    # {month: 1, day: 31}
+
+# Time window for finding analogues: search dates within X days of calendar target date
+# This helps find analogues from the same season/phase
+snapshot_calendar_window: 45  # days (search +/- N days from snapshot calendar date)
+

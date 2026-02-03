@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=preprocess_jra3q
-#SBATCH --output=../Log/preprocess_jra3q.out
-#SBATCH --error=../Log/preprocess_jra3q.err
+#SBATCH --output=../Log/F01_preprocess_jra3q.out
+#SBATCH --error=../Log/F01_preprocess_jra3q.err
 #SBATCH --partition=icelake
 #SBATCH --account=CRANMER-SL3-CPU
 #SBATCH --nodes=1

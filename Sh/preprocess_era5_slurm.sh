@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=preprocess_era5
-#SBATCH --output=../Log/preprocess_era5.out
-#SBATCH --error=../Log/preprocess_era5.err
+#SBATCH --output=../Log/F01_preprocess_era5.out
+#SBATCH --error=../Log/F01_preprocess_era5.err
 #SBATCH --partition=icelake
 #SBATCH --account=CRANMER-SL3-CPU
 #SBATCH --nodes=1
@@ -20,6 +20,11 @@
 #   4. Extract event bounding boxes and apply smoothing (via Python)
 #
 # All steps are conditional: skip if output already exists.
+#
+# Resuming after wall time:
+#   SKIP_YEARLY=true sbatch preprocess_era5_slurm.sh       # Skip Step 1
+#   SKIP_CLIMATOLOGY=true sbatch preprocess_era5_slurm.sh  # Skip Step 2
+#   SKIP_YEARLY=true SKIP_CLIMATOLOGY=true sbatch ...      # Only run Step 3 (anomaly)
 #
 # ERA5 file structure: Monthly files with pattern YYYYMM.nc
 # Each monthly file contains daily data (valid_time dimension)
@@ -72,6 +77,16 @@ START_YEAR=${ERA5_START_YEAR}
 # END_YEAR is already set in env_setting.sh
 # =============================================================================
 
+# =============================================================================
+# Step control: Skip steps if already completed (for resuming after wall time)
+# Usage:
+#   SKIP_YEARLY=true sbatch preprocess_era5_slurm.sh    # Skip Step 1
+#   SKIP_CLIMATOLOGY=true sbatch ...                     # Skip Step 2
+#   SKIP_YEARLY=true SKIP_CLIMATOLOGY=true sbatch ...    # Only run Step 3
+# =============================================================================
+SKIP_YEARLY="${SKIP_YEARLY:-false}"
+SKIP_CLIMATOLOGY="${SKIP_CLIMATOLOGY:-false}"
+
 echo "============================================================"
 echo "ERA5 Preprocessing Pipeline"
 echo "============================================================"
@@ -80,6 +95,12 @@ echo "ROOT_DIR: $ROOT_DIR"
 echo "ERA5_PSURF_DIR: $ERA5_PSURF_DIR"
 echo "Year range: $START_YEAR - $END_YEAR"
 echo "Variables: $VARS_ALL"
+if [ "$SKIP_YEARLY" = "true" ]; then
+    echo "SKIP_YEARLY: true (Step 1 will be skipped)"
+fi
+if [ "$SKIP_CLIMATOLOGY" = "true" ]; then
+    echo "SKIP_CLIMATOLOGY: true (Step 2 will be skipped)"
+fi
 echo "============================================================"
 
 # #region agent log - H2: Log ERA5 paths before directory check
@@ -100,6 +121,10 @@ echo ""
 echo "============================================================"
 echo "Step 1: Merging monthly files to yearly bundles"
 echo "============================================================"
+
+if [ "$SKIP_YEARLY" = "true" ]; then
+    echo "[SKIP] Step 1 skipped (SKIP_YEARLY=true)"
+else
 
 for var in $VARS_ALL; do
     nc_varname="${VAR_CONFIG[$var]}"
@@ -151,6 +176,8 @@ for var in $VARS_ALL; do
     done
 done
 
+fi  # end SKIP_YEARLY
+
 # -----------------------------------------------------------------------------
 # Step 2: Compute daily climatology
 # -----------------------------------------------------------------------------
@@ -158,6 +185,10 @@ echo ""
 echo "============================================================"
 echo "Step 2: Computing daily climatology (366 days)"
 echo "============================================================"
+
+if [ "$SKIP_CLIMATOLOGY" = "true" ]; then
+    echo "[SKIP] Step 2 skipped (SKIP_CLIMATOLOGY=true)"
+else
 
 for var in $VARS_NEED_ANOMALY; do
     clim_file="${CLIM_DIR}/climatology_${var}.nc"
@@ -199,6 +230,8 @@ for var in $VARS_NEED_ANOMALY; do
         rm -f "${clim_file}"
     fi
 done
+
+fi  # end SKIP_CLIMATOLOGY
 
 # -----------------------------------------------------------------------------
 # Step 3: Compute anomalies

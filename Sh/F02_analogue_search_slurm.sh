@@ -6,21 +6,19 @@
 #SBATCH --account=CRANMER-SL3-CPU
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=32G
-#SBATCH --time=02:00:00
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=64G
+#SBATCH --time=04:00:00
 
 # =============================================================================
 # F02: Analogue Search
 # =============================================================================
 # This script performs:
-#   1. Read event definition from Const/extreme_events.yaml
-#   2. Load anomaly data from F01 preprocessing for specified dataset
-#   3. Slice to event bounding box on-the-fly
-#   4. Use snapshot_date as reference pattern
-#   5. Compute latitude-weighted Euclidean distances
-#   6. Find top N analogues in past and present periods
-#   7. Save results to CSV files
+#   1. CDO pre-slice: extract ±calendar_window days + event bbox from anomaly data
+#   2. Load pre-sliced data, use snapshot_date as reference pattern
+#   3. Compute latitude-weighted Euclidean distances
+#   4. Find top N analogues in past and present periods
+#   5. Save results to CSV files
 #
 # Prerequisites: F01_preprocess must be completed for the specified dataset.
 #
@@ -28,15 +26,21 @@
 #   sbatch F02_analogue_search_slurm.sh              # Uses default (era5)
 #   DATASET=era5 sbatch F02_analogue_search_slurm.sh
 #   DATASET=mswx sbatch F02_analogue_search_slurm.sh
+#   SKIP_CDO=true sbatch ...                         # Skip CDO, use Python/dask lazy loading (faster)
 # =============================================================================
 
 set -e  # Exit on error
 
 # -----------------------------------------------------------------------------
-# Load environment settings
+# Load environment settings (venv with poetry must be activated)
 # -----------------------------------------------------------------------------
-ROOT_DIR="/home/yi260/rds/hpc-work/analogue"
-source "${ROOT_DIR}/Const/env_setting.sh"
+cd /home/yi260/rds/hpc-work/analogue
+source Const/env_setting.sh
+
+if ! command -v poetry &>/dev/null; then
+    echo "ERROR: poetry not found. Ensure Const/env_setting.sh activates the venv that contains poetry."
+    exit 1
+fi
 
 # -----------------------------------------------------------------------------
 # Dataset, Event, and Period selection
@@ -49,6 +53,7 @@ source "${ROOT_DIR}/Const/env_setting.sh"
 DATASET="${DATASET:-era5}"
 EVENT="${EVENT:-antarctica_peninsula_2020}"
 PERIOD="${PERIOD:-}"  # Empty = process both periods
+SKIP_CDO="${SKIP_CDO:-false}"  # Skip CDO pre-slicing, use Python/dask lazy loading instead
 
 # Validate dataset
 case "$DATASET" in
@@ -66,6 +71,9 @@ echo "============================================================"
 echo "ROOT_DIR: $ROOT_DIR"
 echo "Dataset: $DATASET"
 echo "Event: $EVENT"
+if [ "$SKIP_CDO" = "true" ]; then
+    echo "SKIP_CDO: true (using Python/dask lazy loading)"
+fi
 echo "============================================================"
 
 # -----------------------------------------------------------------------------
@@ -92,16 +100,35 @@ echo "Events with snapshot_date:"
 grep -A2 "snapshot_date" "${EVENTS_CONFIG}" | head -10 || echo "  (none found)"
 
 # -----------------------------------------------------------------------------
-# Run analogue search
+# Step 1: CDO pre-slice (time window + lat/lon bbox) — before analogue search
+# -----------------------------------------------------------------------------
+SLICED_DIR="${DATA_DIR}/F02_analogue_search/sliced/${DATASET}/${EVENT}"
+echo ""
+if [ "$SKIP_CDO" = "true" ]; then
+    echo "Step 1: Skipped (SKIP_CDO=true). Python will load full anomaly files with lazy slicing."
+elif [ -d "$SLICED_DIR" ] && ls "${SLICED_DIR}"/anomaly_*_sliced.nc 1>/dev/null 2>&1; then
+    echo "Step 1: Sliced data already exists in ${SLICED_DIR}, skipping."
+else
+    echo "Step 1: Pre-slicing anomaly data..."
+    # Use sequential mode for reliability (avoids HDF5/netCDF threading issues)
+    export HDF5_USE_FILE_LOCKING=FALSE
+    SLICE_CMD="poetry run python3 Python/dask_slice.py --dataset $DATASET --event $EVENT --sequential"
+    echo "Running: $SLICE_CMD"
+    eval $SLICE_CMD || {
+        echo "ERROR: Pre-slicing failed."
+        exit 1
+    }
+fi
+
+# -----------------------------------------------------------------------------
+# Step 2: Run analogue search 
 # -----------------------------------------------------------------------------
 echo ""
-echo "Starting analogue search..."
+echo "Step 2: Analogue search..."
 if [ -n "$PERIOD" ]; then
     echo "Period filter: $PERIOD only"
 fi
 echo ""
-
-cd "$ROOT_DIR"
 
 # Build command with optional period argument
 CMD="poetry run python3 Python/analogue_search.py --dataset $DATASET --event $EVENT --force"

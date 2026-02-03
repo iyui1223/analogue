@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=preprocess_mswx
-#SBATCH --output=../Log/preprocess_mswx.out
-#SBATCH --error=../Log/preprocess_mswx.err
+#SBATCH --output=../Log/F01_preprocess_mswx.out
+#SBATCH --error=../Log/F01_preprocess_mswx.err
 #SBATCH --partition=icelake
 #SBATCH --account=CRANMER-SL3-CPU
 #SBATCH --nodes=1
