@@ -133,6 +133,7 @@ endif
 
 * =============================================================================
 * Layer 1: Temperature shading (background)
+* Uses UK Met Office / earth.nullschool.net style colormap (indices 71-125)
 * =============================================================================
 say 'Layer 1: Temperature shading...'
 'set dfile ' % t2m_fnum
@@ -141,9 +142,11 @@ say 'Layer 1: Temperature shading...'
 'set time ' % grads_time
 
 'set gxout shaded'
-'set clevs 233 238 243 248 253 258 263 268 273 278 283'
-'set ccols 20 22 24 26 28 30 31 33 35 37 39'
-'d t2m'
+* Use custom temperature colormap (indices 71-125)
+* Range: -80C to +55C in 5-degree steps (28 levels, 29 colors)
+'set clevs -80 -75 -70 -65 -60 -55 -50 -45 -40 -35 -30 -25 -20 -15 -10 -5 0 5 10 15 20 25 30 35 40 45 50 55'
+'set ccols 71 73 75 77 79 81 83 85 87 89 91 93 95 97 99 101 103 105 107 109 111 113 115 117 119 121 123 125 125'
+'d t2m-273.15'
 
 * =============================================================================
 * Layer 2: Mean Sea Level Pressure contours (gray lines)
@@ -170,12 +173,12 @@ say 'Layer 3: 0 deg C isotherm...'
 'set time ' % grads_time
 
 'set gxout contour'
-'set clevs 273.15'
+'set clevs 0'
 'set cthick 6'
-'set ccolor 99'
+'set ccolor 130'
 'set clab off'
 'set cstyle 1'
-'d t2m'
+'d t2m-273.15'
 
 * =============================================================================
 * Layer 4: Wind vectors at 850 hPa (if available)
@@ -220,9 +223,9 @@ say 'Layer 6: Map boundaries...'
 'draw map'
 
 * =============================================================================
-* Colorbar
+* Colorbar - disabled (using external PNG colorbar instead)
 * =============================================================================
-'run cbarn.gs 0.7 0 5.5 0.5'
+* 'run cbarn.gs 0.7 0 5.5 0.5'
 
 * =============================================================================
 * Titles and labels
@@ -248,7 +251,7 @@ endif
 
 'set strsiz 0.10'
 'set string 1 c 4'
-'draw string 5.5 0.15 Shading: 2m Temp (K) | Gray contours: MSLP (hPa, 4hPa) | Ice-blue line: 0C isotherm'
+'draw string 5.5 0.15 Shading: 2m Temp (C) | Gray contours: MSLP (hPa, 4hPa) | Ice-blue line: 0C isotherm'
 
 * =============================================================================
 * Save output
