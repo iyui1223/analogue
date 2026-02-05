@@ -103,7 +103,7 @@ endif
 'set display color white'
 'c'
 
-'set parea 0.8 10.2 1.2 7.8'
+'set parea 0.8 10.2 1.8 7.8'
 
 year = substr(date_str, 1, 4)
 month = substr(date_str, 6, 2)
@@ -223,9 +223,9 @@ say 'Layer 6: Map boundaries...'
 'draw map'
 
 * =============================================================================
-* Colorbar - disabled (using external PNG colorbar instead)
+* Colorbar - external PNG image
 * =============================================================================
-* 'run cbarn.gs 0.7 0 5.5 0.5'
+'draw image /lustre/soge1/projects/andante/cenv1201/proj/analogue/Const/temperature_colorbar.png 1.0 0.3 10.0 1.4'
 
 * =============================================================================
 * Titles and labels
@@ -251,7 +251,7 @@ endif
 
 'set strsiz 0.10'
 'set string 1 c 4'
-'draw string 5.5 0.15 Shading: 2m Temp (C) | Gray contours: MSLP (hPa, 4hPa) | Ice-blue line: 0C isotherm'
+'draw string 5.5 1.55 Shading: 2m Temp (C) | Gray contours: MSLP (hPa, 4hPa) | Ice-blue line: 0C isotherm'
 
 * =============================================================================
 * Save output
@@ -261,14 +261,12 @@ say 'Saving to: ' % output_file
 
 say 'Saved: ' % output_file
 
-i = file_num
-while (i > 0)
-  'close ' % i
-  i = i - 1
-endwhile
+call close_all() 
 
 say '============================================================'
 say 'Plot complete'
 say '============================================================'
+
+'quit'
 
 return
