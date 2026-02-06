@@ -174,7 +174,7 @@ say 'Layer 3: 0 deg C isotherm...'
 
 'set gxout contour'
 'set clevs 0'
-'set cthick 6'
+'set cthick 12'
 'set ccolor 130'
 'set clab off'
 'set cstyle 1'
@@ -192,7 +192,7 @@ if (has_wind = 1)
   'set ccolor 1'
   'set arrscl 0.4 15'
   'set arrlab off'
-  'd skip(u,10);v.' % vwind_fnum
+  'd skip(u,20);v.' % vwind_fnum
 endif
 
 * =============================================================================
@@ -225,7 +225,7 @@ say 'Layer 6: Map boundaries...'
 * =============================================================================
 * Colorbar - external PNG image
 * =============================================================================
-'draw image /lustre/soge1/projects/andante/cenv1201/proj/analogue/Const/temperature_colorbar.png 1.0 0.3 10.0 1.4'
+# 'draw image /lustre/soge1/projects/andante/cenv1201/proj/analogue/Const/temperature_colorbar.png 1.0 0.3 10.0 1.4'
 
 * =============================================================================
 * Titles and labels
@@ -261,7 +261,7 @@ say 'Saving to: ' % output_file
 
 say 'Saved: ' % output_file
 
-call close_all() 
+call allclose() 
 
 say '============================================================'
 say 'Plot complete'

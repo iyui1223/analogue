@@ -14,7 +14,7 @@
 # Output: Figs/F03_visualization/{event}/{dataset}/{period}_{yyyymmdd}_synoptic.png
 # =============================================================================
 
-set -e
+set -eox
 
 # -----------------------------------------------------------------------------
 # Configuration
@@ -148,6 +148,8 @@ echo ""
 echo "Plotting original event..."
 plot_date "$SNAPSHOT" "original"
 
+exit 0
+
 echo ""
 echo "Plotting ${#PAST_DATES[@]} past analogues..."
 for date in "${PAST_DATES[@]}"; do
@@ -212,6 +214,7 @@ else
     --nina "$NINA34_FILE" \
     --pdo "$PDO_FILE" \
     --glb "$GISTEMP_GLB_FILE" \
+    --original-date "$SNAPSHOT" \
     --outdir "$OUTPUT_DIR"
 fi
 
