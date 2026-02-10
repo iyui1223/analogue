@@ -261,7 +261,7 @@ say 'Saving to: ' % output_file
 
 say 'Saved: ' % output_file
 
-call allclose() 
+allclose 
 
 say '============================================================'
 say 'Plot complete'

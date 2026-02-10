@@ -24,6 +24,9 @@ export ERA5_DIR="/lustre/soge1/data/analysis/era5/0.28125x0.28125"
 export ERA5_DAILY="${ERA5_DIR}/daily"
 export ERA5_INVARIANT="${ERA5_DIR}/invariant"
 
+# GrADS .ctl template directory (for template-based multi-file access)
+export GRADS_CTL_DIR="/lustre/soge1/projects/andante/cenv1201/scripts/data_handling/grads_ctl"
+
 # Other reanalysis datasets (TODO: Set when available)
 export JRA3Q_DIR="/path/to/JRA-3Q"
 export MSWX_DIR="/lustre/soge1/data/analysis/gloh2o-mswx"
