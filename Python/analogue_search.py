@@ -72,16 +72,49 @@ def compute_latitude_weights(lat: xr.DataArray) -> xr.DataArray:
     return weights
 
 
+def _standardize_coords(ds: xr.Dataset) -> xr.DataArray:
+    """Detect and rename coords to standard names; return data variable."""
+    var_names = list(ds.data_vars)
+    if len(var_names) == 0:
+        raise ValueError("No data variables found in anomaly files")
+    data_var = ds[var_names[0]]
+    lat_name = lon_name = time_name = None
+    for coord in ds.coords:
+        coord_lower = coord.lower()
+        if 'lat' in coord_lower:
+            lat_name = coord
+        elif 'lon' in coord_lower:
+            lon_name = coord
+        elif 'time' in coord_lower or 'valid' in coord_lower:
+            time_name = coord
+    if lat_name is None or lon_name is None:
+        raise ValueError(f"Could not detect lat/lon coordinates. Found: {list(ds.coords)}")
+    rename_dict = {}
+    if lat_name != 'lat':
+        rename_dict[lat_name] = 'lat'
+    if lon_name != 'lon':
+        rename_dict[lon_name] = 'lon'
+    if time_name and time_name != 'time':
+        rename_dict[time_name] = 'time'
+    if rename_dict:
+        data_var = data_var.rename(rename_dict)
+    return data_var
+
+
 def load_anomaly_data(
     dataset: str,
     var: str,
     paths: Dict[str, Path],
     region: Dict[str, float],
     year_range: Optional[Tuple[int, int]] = None,
+    sliced_path: Optional[Path] = None,
     verbose: bool = True
 ) -> xr.DataArray:
     """
-    Load anomaly files from F01 preprocessing and slice to event bounding box.
+    Load anomaly data, optionally from a pre-sliced CDO file.
+
+    When sliced_path is provided, loads that single file (already sliced in time/space).
+    Otherwise loads full F01 anomaly files and slices to region in Python.
     
     Parameters
     ----------
@@ -92,9 +125,11 @@ def load_anomaly_data(
     paths : dict
         Data paths from get_data_paths()
     region : dict
-        Event region with lat_min, lat_max, lon_min, lon_max
+        Event region with lat_min, lat_max, lon_min, lon_max (unused when sliced_path set)
     year_range : tuple, optional
-        (start_year, end_year) to filter files. If None, loads all years.
+        (start_year, end_year) to filter files. Ignored when sliced_path set.
+    sliced_path : Path, optional
+        Pre-sliced NetCDF from CDO. If set, loads this file directly.
     verbose : bool
         Print progress messages
         
@@ -103,24 +138,31 @@ def load_anomaly_data(
     xr.DataArray
         Anomaly data sliced to event bounding box
     """
+    if sliced_path is not None and sliced_path.exists():
+        if verbose:
+            print(f"Loading pre-sliced data: {sliced_path.name}")
+        ds = xr.open_dataset(sliced_path, chunks={'time': 365})
+        data_var = _standardize_coords(ds)
+        if verbose:
+            print(f"Data shape: {dict(data_var.sizes)}")
+        return data_var
+
+    # Fallback: load full anomaly files and slice in Python
     anom_dir = paths['data'] / 'F01_preprocess' / dataset / 'anomaly'
     
     if not anom_dir.exists():
         raise FileNotFoundError(f"Anomaly directory not found: {anom_dir}")
     
-    # Find all anomaly files for this variable
     pattern = f"anomaly_{var}_*.nc"
     anom_files = sorted(anom_dir.glob(pattern))
     
     if not anom_files:
         raise FileNotFoundError(f"No anomaly files found: {anom_dir}/{pattern}")
     
-    # Filter files by year range if specified
     if year_range is not None:
         start_year, end_year = year_range
         filtered_files = []
         for f in anom_files:
-            # Extract year from filename: anomaly_psurf_2020.nc -> 2020
             try:
                 year = int(f.stem.split('_')[-1])
                 if start_year <= year <= end_year:
@@ -137,57 +179,16 @@ def load_anomaly_data(
         print(f"  First: {anom_files[0].name}")
         print(f"  Last:  {anom_files[-1].name}")
     
-    # Open all files as a single dataset using xarray
-    # Use combine='by_coords' to concatenate along time
     ds = xr.open_mfdataset(
         anom_files,
         combine='by_coords',
-        chunks={'time': 365}  # Chunk by year for memory efficiency
+        chunks={'time': 365}
     )
     
-    # Get the data variable (first one if multiple)
-    var_names = list(ds.data_vars)
-    if len(var_names) == 0:
-        raise ValueError("No data variables found in anomaly files")
-    
-    data_var = ds[var_names[0]]
+    data_var = _standardize_coords(ds)
     if verbose:
-        print(f"Using variable: {var_names[0]}")
+        print(f"Using variable: {list(ds.data_vars)[0]}")
     
-    # Detect coordinate names
-    lat_name = None
-    lon_name = None
-    time_name = None
-    
-    for coord in ds.coords:
-        coord_lower = coord.lower()
-        if 'lat' in coord_lower:
-            lat_name = coord
-        elif 'lon' in coord_lower:
-            lon_name = coord
-        elif 'time' in coord_lower or 'valid' in coord_lower:
-            time_name = coord
-    
-    if lat_name is None or lon_name is None:
-        raise ValueError(f"Could not detect lat/lon coordinates. Found: {list(ds.coords)}")
-    
-    if verbose:
-        print(f"Coordinates: time={time_name}, lat={lat_name}, lon={lon_name}")
-    
-    # Rename coordinates to standard names
-    rename_dict = {}
-    if lat_name != 'lat':
-        rename_dict[lat_name] = 'lat'
-    if lon_name != 'lon':
-        rename_dict[lon_name] = 'lon'
-    if time_name and time_name != 'time':
-        rename_dict[time_name] = 'time'
-    
-    if rename_dict:
-        data_var = data_var.rename(rename_dict)
-    
-    # Slice to event bounding box
-    # NOTE: Use 0-360 longitude convention in extreme_events.yaml to match ERA5
     lat_min = region['lat_min']
     lat_max = region['lat_max']
     lon_min = region['lon_min']
@@ -196,19 +197,10 @@ def load_anomaly_data(
     if verbose:
         print(f"Slicing to region: lat[{lat_min}, {lat_max}], lon[{lon_min}, {lon_max}]")
     
-    # Handle latitude ordering (some datasets have lat from 90 to -90)
     if data_var.lat[0] > data_var.lat[-1]:
-        # Latitude is descending
-        data_var = data_var.sel(
-            lat=slice(lat_max, lat_min),
-            lon=slice(lon_min, lon_max)
-        )
+        data_var = data_var.sel(lat=slice(lat_max, lat_min), lon=slice(lon_min, lon_max))
     else:
-        # Latitude is ascending
-        data_var = data_var.sel(
-            lat=slice(lat_min, lat_max),
-            lon=slice(lon_min, lon_max)
-        )
+        data_var = data_var.sel(lat=slice(lat_min, lat_max), lon=slice(lon_min, lon_max))
     
     if verbose:
         print(f"Data shape after slicing: {dict(data_var.sizes)}")
@@ -245,16 +237,16 @@ def compute_euclidean_distances(
     """
     # Compute difference (broadcasts reference over time dimension)
     diff = data - reference
-    
+
     # Square the differences
     diff_sq = diff ** 2
-    
+
     # Apply latitude weights (broadcasts over lon dimension)
     weighted_diff_sq = diff_sq * lat_weights
-    
+
     # Sum over spatial dimensions
     sum_weighted_sq = weighted_diff_sq.sum(dim=['lat', 'lon'])
-    
+
     return sum_weighted_sq
 
 
@@ -417,10 +409,21 @@ def find_analogues(
         print(f"N analogues: {n_analogues}")
         print(f"Min time separation: {min_separation}")
     
-    # Load anomaly data sliced to event region
+    # Path to CDO pre-sliced file (same location as cdo_slice.py writes).
+    # CDO slicing is done by the shell script before calling this; we just use the result if it exists.
+    sliced_path = paths["data"] / "F02_analogue_search" / "sliced" / dataset / event_name / f"anomaly_{match_var}_sliced.nc"
+    sliced_exists = sliced_path.exists()
+    
+    if verbose:
+        if sliced_exists:
+            print(f"\nUsing CDO pre-sliced file: {sliced_path.relative_to(paths['data'])}")
+        else:
+            print(f"\nCDO sliced file not found ({sliced_path.name}), loading full anomaly files and slicing in Python.")
+
+    # Load anomaly data sliced to event region (from sliced file if present, else full F01 + slice)
     if verbose:
         print(f"\nLoading anomaly data...")
-        if year_range:
+        if year_range and not sliced_exists:
             print(f"  Year range filter: {year_range[0]}-{year_range[1]}")
     
     data_var = load_anomaly_data(
@@ -429,6 +432,7 @@ def find_analogues(
         paths=paths,
         region=region,
         year_range=year_range,
+        sliced_path=sliced_path if sliced_exists else None,
         verbose=verbose
     )
     
@@ -773,7 +777,6 @@ def main():
         action='store_true',
         help='Suppress verbose output'
     )
-    
     args = parser.parse_args()
     
     skip_existing = not args.force
