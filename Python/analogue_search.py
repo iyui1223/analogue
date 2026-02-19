@@ -35,7 +35,7 @@ from data_utils import (
 )
 
 # #region agent log - Debug logging helper
-DEBUG_LOG = Path.home() / "andante/cenv1201/proj/analogue/.cursor/debug.log"
+DEBUG_LOG = Path.home() / ".cursor/debug.log"
 
 def debug_log(hypothesis_id: str, location: str, message: str, data: dict):
     """Append debug log entry to NDJSON file."""
@@ -52,22 +52,32 @@ def debug_log(hypothesis_id: str, location: str, message: str, data: dict):
 # #endregion
 
 
-def compute_latitude_weights(lat: xr.DataArray) -> xr.DataArray:
+def compute_latitude_weights(lat: xr.DataArray, lon: Optional[xr.DataArray] = None) -> xr.DataArray:
     """
     Compute latitude weights proportional to cos(lat).
-    
+    Optionally multiply by 2D Gaussian to emphasize region center (hardcoded: 68°S 64°W, sigma 10°).
+
     Parameters
     ----------
     lat : xr.DataArray
         Latitude coordinate array
-        
+    lon : xr.DataArray, optional
+        Longitude coordinate array. If provided, applies 2D Gaussian weight.
+
     Returns
     -------
     xr.DataArray
-        Latitude weights normalized to sum to 1
+        Weights normalized to sum to 1
     """
     weights = np.cos(np.deg2rad(lat))
-    # Normalize so weights sum to 1
+    if lon is not None:
+        # Gaussian weight: center 68°S 64°W (lon 296 in 0-360), sigma 10°
+        center_lat, center_lon, sigma = -68.0, 296.0, 10.0
+        lon2, lat2 = np.meshgrid(lon.values, lat.values)
+        gaussian = np.exp(-((lat2 - center_lat) ** 2 + (lon2 - center_lon) ** 2) / (2 * sigma ** 2))
+        cos_lat_2d = np.cos(np.deg2rad(lat.values))[:, np.newaxis]
+        weights = (cos_lat_2d * gaussian).astype(np.float64)
+        weights = xr.DataArray(weights, dims=('lat', 'lon'), coords={'lat': lat, 'lon': lon})
     weights = weights / weights.sum()
     return weights
 
@@ -235,6 +245,7 @@ def compute_euclidean_distances(
     xr.DataArray
         Distance for each time step, dimension (time,)
     """
+    
     # Compute difference (broadcasts reference over time dimension)
     diff = data - reference
 
@@ -476,8 +487,8 @@ def find_analogues(
         print(f"Actual snapshot date used: {actual_snapshot.strftime('%Y-%m-%d')}")
         print(f"Reference pattern shape: {reference.shape}")
     
-    # Compute latitude weights
-    lat_weights = compute_latitude_weights(data_var.lat)
+    # Compute spatial weights (lat + optional Gaussian)
+    lat_weights = compute_latitude_weights(data_var.lat, data_var.lon)
     
     # Compute distances to all time steps
     if verbose:
