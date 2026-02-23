@@ -37,7 +37,7 @@
 set -eox
 
 # Use actual lustre path (not symlink) for SLURM compatibility
-ROOT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue"
+ROOT_DIR="/soge-home/users/cenv1201/andante/cenv1201/proj/analogue_gaussian/analogue/
 source "${ROOT_DIR}/Const/env_setting.sh"
 
 # override the default paths as those are not visible from CPU nodes

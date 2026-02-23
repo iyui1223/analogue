@@ -20,6 +20,7 @@ Reads:
 import argparse
 import os
 from datetime import datetime, timedelta
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -30,18 +31,31 @@ import matplotlib.pyplot as plt
 K2C = 273.15
 DEFAULT_NTOP = 5
 DEFAULT_LEAD_DAYS = 15
+LAND_THRESHOLD = 0.5
 PAST_RANGE = (1948, 1987)
 PRESENT_RANGE = (1988, 2026)
+DEFAULT_LSM_PATH = "/lustre/soge1/data/analysis/era5/0.28125x0.28125/invariant/land-sea_mask/nc/era5_invariant_land-sea_mask_20000101.nc"
 
 
 def load_event_config(yaml_path: str, event_name: str) -> dict:
-    """Return event dict with start_date, end_date, snapshot_date."""
+    """Return event dict with start_date, end_date, snapshot_date, boxplot_region."""
     with open(yaml_path) as f:
         data = yaml.safe_load(f)
     for ev in data.get("events", []):
         if ev.get("name") == event_name:
             return ev
     raise KeyError(f"Event {event_name!r} not found in {yaml_path}")
+
+
+def get_boxplot_bbox(event_cfg: dict) -> tuple:
+    """Return (lat_min, lat_max, lon_min, lon_max) for box plot domain.
+    Longitude is in 0–360 (netCDF convention). Uses boxplot_region, else region."""
+    box = event_cfg.get("boxplot_region") or event_cfg.get("region", {})
+    lat_min = float(box.get("lat_min", -70.0))
+    lat_max = float(box.get("lat_max", -60.0))
+    lon_min = float(box.get("lon_min", 280.0))   # 0–360 (e.g. 280 = 80°W)
+    lon_max = float(box.get("lon_max", 310.0))   # 0–360 (e.g. 310 = 50°W)
+    return lat_min, lat_max, lon_min, lon_max
 
 
 def load_analogues(csv_path: str, n_top: int):
@@ -68,12 +82,49 @@ def data_slice_file_path(data_dir: str, d: datetime) -> str:
     return os.path.join(data_dir, f"{d.year}{d.month:02d}.nc")
 
 
+def load_land_mask(
+    lsm_path: str,
+    lat_min: float,
+    lat_max: float,
+    lon_min: float,
+    lon_max: float,
+    t2m_template: xr.DataArray,
+) -> np.ndarray:
+    """Load ERA5 LSM, subset to bbox, align to T2m grid. Return 2D boolean (True=land)."""
+    ds = xr.open_dataset(lsm_path)
+    lsm = ds["lsm"].isel(time=0)
+    if str(lsm.dtype) in ("int16", "int32"):
+        sf = float(getattr(ds["lsm"], "scale_factor", 1.0))
+        ao = float(getattr(ds["lsm"], "add_offset", 0.0))
+        lsm = lsm.astype(np.float64) * sf + ao
+    lon = lsm.coords["longitude"]
+    lon_0_360 = float(lon.min()) >= 0
+    # bbox lon is 0–360; LSM uses 0–360, so use as-is (or +360 if stored as -180–180)
+    lon_lo = lon_min + 360 if (lon_0_360 and lon_min < 0) else lon_min
+    lon_hi = lon_max + 360 if (lon_0_360 and lon_max < 0) else lon_max
+    # LSM lat typically -90 to 90 (increasing); use slice(lat_min, lat_max)
+    lsm_sub = lsm.sel(
+        latitude=slice(lat_min, lat_max),
+        longitude=slice(lon_lo, lon_hi),
+    )
+    lsm_aligned = lsm_sub.reindex_like(t2m_template, method="nearest")
+    land = (lsm_aligned.values >= LAND_THRESHOLD).squeeze()
+    ds.close()
+    return land
+
+
 def get_t2m_domain_mean_series(
     start_date: datetime,
     ndays: int,
     data_dir: str,
+    lat_min: float,
+    lat_max: float,
+    lon_min: float,
+    lon_max: float,
+    land_mask: Optional[np.ndarray] = None,
 ) -> np.ndarray:
-    """Load T2m from data_slice monthly files; spatial mean over domain. Return 1D array in °C."""
+    """Load T2m from data_slice monthly files; subset to bbox; mean over land if mask given.
+    Return 1D array in °C."""
     months_needed = sorted(
         set(
             (
@@ -90,7 +141,24 @@ def get_t2m_domain_mean_series(
             raise FileNotFoundError(path)
         ds = xr.open_dataset(path)
         t2m = ds["t2m"]
-        vals = (t2m.values - K2C).astype(np.float64)
+        # Subset to bounding box (Layer 1: lat/lon domain)
+        lat_slice = slice(lat_max, lat_min) if lat_max > lat_min else slice(lat_min, lat_max)
+        # Longitude: bbox is 0–360; convert if data uses -180–180
+        data_lon = t2m.coords["longitude"]
+        if float(data_lon.min()) < 0:
+            sel_lo = lon_min - 360 if lon_min > 180 else lon_min
+            sel_hi = lon_max - 360 if lon_max > 180 else lon_max
+        else:
+            sel_lo, sel_hi = lon_min, lon_max
+        sub = t2m.sel(
+            latitude=lat_slice,
+            longitude=slice(sel_lo, sel_hi),
+        )
+        vals = (sub.values - K2C).astype(np.float64)
+        # Layer 2: land mask (skip if land_mask is None)
+        if land_mask is not None and land_mask.size > 0:
+            mask_bc = np.broadcast_to(land_mask, vals.shape)
+            vals = np.where(mask_bc, vals, np.nan)
         daily_means = np.nanmean(vals, axis=tuple(range(1, vals.ndim)))
         monthly_data[(year, month)] = daily_means
         ds.close()
@@ -105,7 +173,16 @@ def get_t2m_domain_mean_series(
     return out
 
 
-def compute_background_series(data_dir: str, start_date: datetime, lead_days: int):
+def compute_background_series(
+    data_dir: str,
+    start_date: datetime,
+    lead_days: int,
+    lat_min: float,
+    lat_max: float,
+    lon_min: float,
+    lon_max: float,
+    land_mask: Optional[np.ndarray] = None,
+):
     """
     Mean T2m over past half and present half for the same calendar window as the event.
     Uses event's calendar window (e.g. Feb 1–15) for each year in past/present ranges.
@@ -114,7 +191,11 @@ def compute_background_series(data_dir: str, start_date: datetime, lead_days: in
     for year in range(PAST_RANGE[0], PAST_RANGE[1] + 1):
         try:
             ref_start = start_date.replace(year=year)
-            s = get_t2m_domain_mean_series(ref_start, lead_days, data_dir)
+            s = get_t2m_domain_mean_series(
+                ref_start, lead_days, data_dir,
+                lat_min, lat_max, lon_min, lon_max,
+                land_mask,
+            )
             past_series.append(s)
         except (FileNotFoundError, ValueError):
             pass
@@ -122,7 +203,11 @@ def compute_background_series(data_dir: str, start_date: datetime, lead_days: in
     for year in range(PRESENT_RANGE[0], PRESENT_RANGE[1] + 1):
         try:
             ref_start = start_date.replace(year=year)
-            s = get_t2m_domain_mean_series(ref_start, lead_days, data_dir)
+            s = get_t2m_domain_mean_series(
+                ref_start, lead_days, data_dir,
+                lat_min, lat_max, lon_min, lon_max,
+                land_mask,
+            )
             present_series.append(s)
         except (FileNotFoundError, ValueError):
             pass
@@ -179,6 +264,16 @@ def main():
         default=DEFAULT_LEAD_DAYS,
         help=f"Number of lead days (default: {DEFAULT_LEAD_DAYS})",
     )
+    parser.add_argument(
+        "--no-land-mask",
+        action="store_true",
+        help="Skip land-sea mask; use all grid points in bbox (default: use land only)",
+    )
+    parser.add_argument(
+        "--lsm-path",
+        default=os.environ.get("ERA5_LSM_PATH", DEFAULT_LSM_PATH),
+        help="Path to ERA5 land-sea mask netCDF (default: ERA5_LSM_PATH or built-in)",
+    )
     args = parser.parse_args()
 
     event_cfg = load_event_config(args.events_yaml, args.event)
@@ -188,10 +283,47 @@ def main():
     if lead_days < 1:
         lead_days = args.lead_days
 
+    lat_min, lat_max, lon_min, lon_max = get_boxplot_bbox(event_cfg)
+
+    land_mask = None
+    if not args.no_land_mask:
+        path0 = data_slice_file_path(args.data_dir, target_start)
+        if os.path.isfile(path0):
+            with xr.open_dataset(path0) as ds0:
+                t2m0 = ds0["t2m"]
+                lat_slice = slice(lat_max, lat_min) if lat_max > lat_min else slice(lat_min, lat_max)
+                data_lon = t2m0.coords["longitude"]
+                if float(data_lon.min()) < 0:
+                    sel_lo = lon_min - 360 if lon_min > 180 else lon_min
+                    sel_hi = lon_max - 360 if lon_max > 180 else lon_max
+                else:
+                    sel_lo, sel_hi = lon_min, lon_max
+                t2m_sub = t2m0.sel(
+                    latitude=lat_slice,
+                    longitude=slice(sel_lo, sel_hi),
+                )
+                if os.path.isfile(args.lsm_path):
+                    land_mask = load_land_mask(
+                        args.lsm_path, lat_min, lat_max, lon_min, lon_max, t2m_sub
+                    )
+                    if np.sum(land_mask) == 0:
+                        print("No land points in LSM for this bbox; using all points")
+                        land_mask = None
+                    else:
+                        print("Using land-sea mask: land only")
+                else:
+                    print("LSM file not found, using all points:", args.lsm_path)
+        else:
+            print("Cannot load LSM template (data not found), using all points")
+    else:
+        print("Skipping land mask (--no-land-mask)")
+
     past_analogues, present_analogues = load_analogues(args.analogues, args.ntop)
 
     target_series = get_t2m_domain_mean_series(
-        target_start, lead_days, args.data_dir
+        target_start, lead_days, args.data_dir,
+        lat_min, lat_max, lon_min, lon_max,
+        land_mask,
     )
 
     past_series = []
@@ -199,7 +331,11 @@ def main():
         snap = a["date"]
         start = snap - timedelta(days=7)
         try:
-            s = get_t2m_domain_mean_series(start, lead_days, args.data_dir)
+            s = get_t2m_domain_mean_series(
+                start, lead_days, args.data_dir,
+                lat_min, lat_max, lon_min, lon_max,
+                land_mask,
+            )
             past_series.append(s)
         except FileNotFoundError as e:
             print("Skip past", snap.date(), e)
@@ -210,7 +346,11 @@ def main():
         snap = a["date"]
         start = snap - timedelta(days=7)
         try:
-            s = get_t2m_domain_mean_series(start, lead_days, args.data_dir)
+            s = get_t2m_domain_mean_series(
+                start, lead_days, args.data_dir,
+                lat_min, lat_max, lon_min, lon_max,
+                land_mask,
+            )
             present_series.append(s)
         except FileNotFoundError as e:
             print("Skip present", snap.date(), e)
@@ -220,7 +360,9 @@ def main():
     present_arr = np.array(present_series) if present_series else np.zeros((0, lead_days))
 
     past_bg, present_bg = compute_background_series(
-        args.data_dir, target_start, lead_days
+        args.data_dir, target_start, lead_days,
+        lat_min, lat_max, lon_min, lon_max,
+        land_mask,
     )
 
     os.makedirs(args.outdir, exist_ok=True)
@@ -302,8 +444,13 @@ def main():
     ax.set_xticks(lead)
     ax.set_xticklabels(date_labels, rotation=45, ha="right")
     ax.set_ylabel("2 m temperature (°C)")
+    region_label = "land " if (land_mask is not None and land_mask.size > 0) else ""
+    # Display lon as °W for 0–360 (e.g. 280 → 80°W)
+    lon_lo_disp = 360 - lon_min if lon_min > 180 else abs(lon_min)
+    lon_hi_disp = 360 - lon_max if lon_max > 180 else abs(lon_max)
     ax.set_title(
-        f"T2m peninsula mean — top {args.ntop} past; top {n_present_analogues} present + target"
+        f"T2m {region_label}mean ({abs(lat_min):.0f}–{abs(lat_max):.0f}°S, {lon_lo_disp:.0f}–{lon_hi_disp:.0f}°W) — "
+        f"top {args.ntop} past; top {n_present_analogues} present + target"
     )
     ax.legend(loc="best", fontsize=8)
     # Vertical grid at target event dates; horizontal at 0 and every 2 degrees (°C)

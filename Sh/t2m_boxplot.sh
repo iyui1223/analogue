@@ -98,13 +98,11 @@ if [ ! -f "$PY_SCRIPT" ]; then
     exit 1
 fi
 
-python3 "$PY_SCRIPT" \
-    --data-dir "$DATA_SLICE_DIR" \
-    --analogues "$ANALOGUES_FILE" \
-    --events-yaml "$EVENTS_FILE" \
-    --event "$EVENT" \
-    --outdir "$OUTPUT_DIR" \
-    --ntop "$NTOP"
+BOXPLOT_ARGS="--data-dir $DATA_SLICE_DIR --analogues $ANALOGUES_FILE --events-yaml $EVENTS_FILE --event $EVENT --outdir $OUTPUT_DIR --ntop $NTOP"
+# Optional: skip land mask (default: use land only)
+[ "${NO_LAND_MASK:-0}" = "1" ] && BOXPLOT_ARGS="$BOXPLOT_ARGS --no-land-mask"
+
+python3 "$PY_SCRIPT" $BOXPLOT_ARGS
 
 echo ""
 echo "============================================================"

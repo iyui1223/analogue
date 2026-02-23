@@ -18,6 +18,11 @@ events:
       lat_max: -55.0
       lon_min: 225.0   # -135 + 360
       lon_max: 325.0   # -35 + 360
+    boxplot_region:
+      lat_min: -70.0   # 70S
+      lat_max: -60.0   # 60S
+      lon_min: 280.0   # 80W (0–360)
+      lon_max: 310.0   # 50W (0–360)
 
   # February 2022 Antarctic Peninsula minor heatwave
   - name: "antarctica_peninsula_2022"
@@ -31,6 +36,11 @@ events:
       lat_max: -55.0
       lon_min: 225.0   # -135 + 360
       lon_max: 325.0   # -35 + 360
+    boxplot_region:
+      lat_min: -70.0   # 70S
+      lat_max: -60.0   # 60S
+      lon_min: 280.0   # 80W (0–360)
+      lon_max: 310.0   # 50W (0–360)
       
   # March 2015 Peninsula warm spell
   - name: "antarctica_peninsula_2015"
@@ -44,6 +54,11 @@ events:
       lat_max: -55.0
       lon_min: 225.0   # -135 + 360
       lon_max: 325.0   # -35 + 360
+    boxplot_region:
+      lat_min: -70.0   # 70S
+      lat_max: -60.0   # 60S
+      lon_min: 280.0   # 80W (0–360)
+      lon_max: 310.0   # 50W (0–360)
 
   # -------------------------------------------------------------------------
   # European Events (example/reference)
