@@ -16,7 +16,7 @@
 #   - Data/F02_analogue_search/{dataset}/{event}/analogues.csv (analogue dates)
 #   - GrADS .ctl templates via GRADS_CTL_DIR
 #
-# Output: Figs/F03_visualization/{event}/{dataset}/Tsurfdiff_{period}_{idx}_{offset}.png
+# Output: Figs/F03_visualization/{event}/{dataset}/daily_snapshots/Tsurfdiff_*.png
 # =============================================================================
 
 set -eox
@@ -100,7 +100,7 @@ mapfile -t PRESENT_DATES < <(awk -F',' 'NR>1 && $7=="present" {print $1}' "$ANAL
 # -----------------------------------------------------------------------------
 # Setup
 # -----------------------------------------------------------------------------
-OUTPUT_DIR="${FIGS_BASE}/${EVENT}/${DATASET}"
+OUTPUT_DIR="${FIGS_BASE}/${EVENT}/${DATASET}/daily_snapshots"
 mkdir -p "$OUTPUT_DIR"
 
 echo "============================================================"

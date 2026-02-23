@@ -11,7 +11,7 @@
 #   - Const/extreme_events.yaml (event definitions)
 #   - Data/F02_analogue_search/{dataset}/{event}/analogues.csv (analogue dates)
 #
-# Output: Figs/F03_visualization/{event}/{dataset}/{period}_{index}_{offset}_synoptic.png
+# Output: Figs/F03_visualization/{event}/{dataset}/daily_snapshots/Tsurf_*.png
 # where:
 #   period = past | present | original
 #   index  = integer index of analogue in the list (starting at 1). original uses 0
@@ -101,7 +101,7 @@ mapfile -t PRESENT_DATES < <(awk -F',' 'NR>1 && $7=="present" {print $1}' "$ANAL
 # -----------------------------------------------------------------------------
 # Setup
 # -----------------------------------------------------------------------------
-OUTPUT_DIR="${FIGS_BASE}/${EVENT}/${DATASET}"
+OUTPUT_DIR="${FIGS_BASE}/${EVENT}/${DATASET}/daily_snapshots"
 mkdir -p "$OUTPUT_DIR"
 
 echo "============================================================"

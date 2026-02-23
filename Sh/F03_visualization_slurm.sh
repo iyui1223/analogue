@@ -40,8 +40,7 @@ set -eox
 ROOT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue"
 source "${ROOT_DIR}/Const/env_setting.sh"
 
-export MPLCONFIGDIR="/hn01-home/cenv1201/.matplotlib"
-export CARTOPY_USER_BASE_DIR="/hn01-home/cenv1201/.cartopy"
+# override the default paths as those are not visible from CPU nodes
 
 echo "Using GrADS: ${GRADS_CMD}"
 
