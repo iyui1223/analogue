@@ -13,10 +13,11 @@
 # F03: Visualization Pipeline — Master Dispatcher (SLURM batch version)
 # =============================================================================
 # Runs all F03 sub-scripts in sequence:
-#   1. F03_snapshots.sh        — Tsurf snapshot maps (GrADS)
-#   2. F03_Tsurfdiff.sh        — Tsurf difference maps: analogue minus original (GrADS)
-#   3. F03_spaghetti.sh        — Z500/T850 spaghetti plots (GrADS)
-#   4. F03_index_scatter.sh    — Climate index scatter plots (Python)
+#   1. snapshots.sh        — Tsurf snapshot maps (GrADS)
+#   2. Tsurfdiff.sh        — Tsurf difference maps: analogue minus original (GrADS)
+#   3. spaghetti.sh        — Z500 spaghetti plots (GrADS)
+#   4. t2m_boxplot.sh      — T2m box-and-whisker by lead time (Python)
+#   5. index_scatter.sh    — Climate index scatter plots (Python)
 #
 # Usage:
 #   sbatch F03_visualization_slurm.sh                                  # defaults
@@ -26,7 +27,11 @@
 #   SKIP_TSURF=1 sbatch F03_visualization_slurm.sh    # skip Tsurf snapshots
 #   SKIP_TSURFDIFF=1 sbatch ...                        # skip Tsurf difference maps
 #   SKIP_SPAGHETTI=1 sbatch ...                        # skip spaghetti plots
-#   SKIP_SCATTER=1 sbatch ...                           # skip index scatter
+#   SKIP_BOXPLOT=1 sbatch ...                          # skip T2m box plot
+#   SKIP_SCATTER=1 sbatch ...                          # skip index scatter
+#
+# Ensemble size for box plot (default 5):
+#   NTOP=7 sbatch F03_visualization_slurm.sh
 # =============================================================================
 
 set -eox
@@ -35,15 +40,20 @@ set -eox
 ROOT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue"
 source "${ROOT_DIR}/Const/env_setting.sh"
 
+export MPLCONFIGDIR="/hn01-home/cenv1201/.matplotlib"
+export CARTOPY_USER_BASE_DIR="/hn01-home/cenv1201/.cartopy"
+
 echo "Using GrADS: ${GRADS_CMD}"
 
 # Dataset and event can be overridden via environment variables
 DATASET="${DATASET:-era5}"
 EVENT="${EVENT:-}"
-SKIP_TSURF="${SKIP_TSURF:-0}"
-SKIP_TSURFDIFF="${SKIP_TSURFDIFF:-0}"
+SKIP_TSURF="${SKIP_TSURF:-1}"
+SKIP_TSURFDIFF="${SKIP_TSURFDIFF:-1}"
 SKIP_SPAGHETTI="${SKIP_SPAGHETTI:-0}"
-SKIP_SCATTER="${SKIP_SCATTER:-0}"
+SKIP_BOXPLOT="${SKIP_BOXPLOT:-0}"
+SKIP_SCATTER="${SKIP_SCATTER:-1}"
+NTOP="${NTOP:-5}"
 
 echo "============================================================"
 echo "F03: Visualization Pipeline — Master Dispatcher"
@@ -53,7 +63,9 @@ echo "Event:            ${EVENT:-all}"
 echo "Skip Tsurf:       $SKIP_TSURF"
 echo "Skip Tsurfdiff:   $SKIP_TSURFDIFF"
 echo "Skip Spaghetti:   $SKIP_SPAGHETTI"
+echo "Skip Boxplot:     $SKIP_BOXPLOT"
 echo "Skip Scatter:     $SKIP_SCATTER"
+echo "Boxplot N top:    $NTOP"
 echo "============================================================"
 
 cd "${ROOT_DIR}/Sh"
@@ -63,14 +75,16 @@ ARGS=""
 [ -n "$DATASET" ] && ARGS="$ARGS --dataset $DATASET"
 [ -n "$EVENT" ]   && ARGS="$ARGS --event $EVENT"
 
+ARGS_BOXPLOT="$ARGS --ntop $NTOP"
+
 # -------------------------------------------------------
 # 1. Tsurf snapshot maps
 # -------------------------------------------------------
 if [ "$SKIP_TSURF" != "1" ]; then
     echo ""
-    echo ">>> Running F03_snapshots.sh (Tsurf snapshots)..."
+    echo ">>> Running snapshots.sh (Tsurf snapshots)..."
     echo "------------------------------------------------------------"
-    ./F03_snapshots.sh $ARGS || echo "[WARN] F03_snapshots.sh exited with non-zero status"
+    ./snapshots.sh $ARGS || echo "[WARN] snapshots.sh exited with non-zero status"
 else
     echo ""
     echo ">>> Skipping Tsurf snapshots (SKIP_TSURF=1)"
@@ -81,9 +95,9 @@ fi
 # -------------------------------------------------------
 if [ "$SKIP_TSURFDIFF" != "1" ]; then
     echo ""
-    echo ">>> Running F03_Tsurfdiff.sh (Tsurf difference maps)..."
+    echo ">>> Running Tsurfdiff.sh (Tsurf difference maps)..."
     echo "------------------------------------------------------------"
-    ./F03_Tsurfdiff.sh $ARGS || echo "[WARN] F03_Tsurfdiff.sh exited with non-zero status"
+    ./Tsurfdiff.sh $ARGS || echo "[WARN] Tsurfdiff.sh exited with non-zero status"
 else
     echo ""
     echo ">>> Skipping Tsurf difference maps (SKIP_TSURFDIFF=1)"
@@ -94,22 +108,35 @@ fi
 # -------------------------------------------------------
 if [ "$SKIP_SPAGHETTI" != "1" ]; then
     echo ""
-    echo ">>> Running F03_spaghetti.sh (Z500/T850 spaghetti)..."
+    echo ">>> Running spaghetti.sh (Z500/T850 spaghetti)..."
     echo "------------------------------------------------------------"
-    ./F03_spaghetti.sh $ARGS || echo "[WARN] F03_spaghetti.sh exited with non-zero status"
+    ./spaghetti.sh $ARGS || echo "[WARN] spaghetti.sh exited with non-zero status"
 else
     echo ""
     echo ">>> Skipping spaghetti plots (SKIP_SPAGHETTI=1)"
 fi
 
 # -------------------------------------------------------
-# 4. Climate index scatter plots
+# 4. T2m box plot
+# -------------------------------------------------------
+if [ "$SKIP_BOXPLOT" != "1" ]; then
+    echo ""
+    echo ">>> Running t2m_boxplot.sh (T2m box-and-whisker)..."
+    echo "------------------------------------------------------------"
+    ./t2m_boxplot.sh $ARGS_BOXPLOT || echo "[WARN] t2m_boxplot.sh exited with non-zero status"
+else
+    echo ""
+    echo ">>> Skipping T2m box plot (SKIP_BOXPLOT=1)"
+fi
+
+# -------------------------------------------------------
+# 5. Climate index scatter plots
 # -------------------------------------------------------
 if [ "$SKIP_SCATTER" != "1" ]; then
     echo ""
-    echo ">>> Running F03_index_scatter.sh (index scatter)..."
+    echo ">>> Running index_scatter.sh (index scatter)..."
     echo "------------------------------------------------------------"
-    ./F03_index_scatter.sh $ARGS || echo "[WARN] F03_index_scatter.sh exited with non-zero status"
+    ./index_scatter.sh $ARGS || echo "[WARN] index_scatter.sh exited with non-zero status"
 else
     echo ""
     echo ">>> Skipping index scatter plots (SKIP_SCATTER=1)"
