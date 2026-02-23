@@ -19,30 +19,31 @@ events:
       lon_min: 225.0   # -135 + 360
       lon_max: 325.0   # -35 + 360
 
-  # March 2022 East Antarctica warm anomaly
-  - name: "east_antarctica_2022"
-    description: "March 2022 East Antarctica warm anomaly"
-    start_date: "2022-03-15"
-    end_date: "2022-03-20"
-    snapshot_date: "2022-03-18"
+  # February 2022 Antarctic Peninsula minor heatwave
+  - name: "antarctica_peninsula_2022"
+    description: "February 2022 Antarctic Peninsula heatwave"
+    start_date: "2022-02-01"
+    end_date: "2022-02-15"
+    snapshot_date: "2022-02-08"
     projection: "sps"  # South Polar Stereographic for Antarctic events
     region:
-      lat_min: -80.0
-      lat_max: -65.0
-      lon_min: 80.0
-      lon_max: 150.0
-
+      lat_min: -85.0
+      lat_max: -55.0
+      lon_min: 225.0   # -135 + 360
+      lon_max: 325.0   # -35 + 360
+      
   # March 2015 Peninsula warm spell
   - name: "antarctica_peninsula_2015"
     description: "March 2015 Antarctic Peninsula warm spell"
-    start_date: "2015-03-22"
-    end_date: "2015-03-26"
+    start_date: "2015-03-20"
+    end_date: "2015-03-28"
+    snapshot_date: "2015-03-24"
     projection: "sps"  # South Polar Stereographic for Antarctic events
     region:
-      lat_min: -70.0
-      lat_max: -60.0
-      lon_min: 290.0   # -70 + 360
-      lon_max: 305.0   # -55 + 360
+      lat_min: -85.0
+      lat_max: -55.0
+      lon_min: 225.0   # -135 + 360
+      lon_max: 325.0   # -35 + 360
 
   # -------------------------------------------------------------------------
   # European Events (example/reference)

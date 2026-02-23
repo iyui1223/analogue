@@ -2,44 +2,35 @@
 * plot_spaghetti.gs  (reference / template)
 * =============================================================================
 * NOTE: The actual spaghetti plotting scripts are generated dynamically by
-*       Sh/F03_spaghetti.sh into Work/F03_spaghetti/spaghetti_*.gs
+*       Sh/spaghetti.sh into Work/F03_spaghetti/spaghetti_Z500_*.gs
 *       because each plot requires opening many individual monthly ERA5 files
-*       (one per member × day offset).
+*       (one per member).
 *
 *       This file documents the GrADS conventions and colour scheme used.
 *       It is NOT called directly by the pipeline.
 * =============================================================================
 *
-* Two-panel Antarctic polar-stereographic spaghetti map concept:
-*   Panel: Z500 contours (all members overlaid on one map)
-*   Panel: T850 contours (all members overlaid on one map)
+* Single-panel Z500 spaghetti map:
+*   - Full Antarctic domain (lat -90 to -50, lon 0-360) when projection is sps
+*   - Original event + top 5 past + top 5 present analogues
+*   - Snapshot date only (day 0)
 *
-* Colour scheme (custom RGB indices 20-47):
-*   Original event (indices 20-27):
-*     Day 0: black (0,0,0)  → Day 7: light gray (220,220,220)
-*   Past analogues (indices 30-37):
-*     Day 0: dark blue (0,0,180) → Day 7: pale blue (180,210,245)
-*   Present analogues (indices 40-47):
-*     Day 0: dark red (180,0,0) → Day 7: pale red (245,210,180)
+* Colour scheme (custom RGB indices 20, 30, 40):
+*   Original event:  black (0,0,0)
+*   Past analogues:  dark blue (0,0,180)
+*   Present analogues: dark red (180,0,0)
 *
-* Line thickness:
-*   Original: 8 (day 0) tapering to 3 (day 7)
-*   Analogues: 5 (day 0) tapering to 2 (day 7)
+* Line thickness: Original 6, analogues 4
 *
 * Data conventions:
 *   - ERA5 monthly files: era5_daily_{varname}_{YYYY}_{MM}.nc
 *   - Geopotential variable: z (units: m**2 s**-2), plotted as z/9.80665 (gpm)
-*   - Temperature variable:  t (units: K)
-*   - Level dimension: millibars (set lev 500 for Z500, set lev 850 for T850)
+*   - Level: set lev 500
 *   - Time: set time DDmonYYYY (e.g. 08feb2020)
 *
-* Suggested contour levels (keep to 1-2 widely-spaced values):
-*   Z500: 5000 5400  (gpm)
-*   T850: 255  275   (K)
+* Contour levels: Z500 5000 5400 (gpm)
 *
-* Projection:
-*   Antarctic events: set mproj sps
-*   Mid-latitude:     default latlon
+* Projection: Antarctic events use set mproj sps
 * =============================================================================
 
 * --- Example snippet for a single overlay ---
