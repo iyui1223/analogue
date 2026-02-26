@@ -35,6 +35,7 @@ from data_utils import (
 )
 
 from analogue_weights import (
+    great_circle_distance_km,
     compute_gaussian_weights,
     combine_lat_gaussian_weights,
 )
@@ -57,24 +58,62 @@ def debug_log(hypothesis_id: str, location: str, message: str, data: dict):
 # #endregion
 
 
-def compute_latitude_weights(lat: xr.DataArray) -> xr.DataArray:
+def compute_latitude_weights_1d(lat: xr.DataArray) -> xr.DataArray:
     """
-    Compute latitude weights proportional to cos(lat).
+    Compute latitude weights proportional to cos(lat) (1D over lat).
     
-    Parameters
-    ----------
-    lat : xr.DataArray
-        Latitude coordinate array
-        
-    Returns
-    -------
-    xr.DataArray
-        Latitude weights normalized to sum to 1
+    Returns an xr.DataArray with dim ('lat',) normalized so sum == 1.
     """
     weights = np.cos(np.deg2rad(lat))
-    # Normalize so weights sum to 1
     weights = weights / weights.sum()
-    return weights
+    return xr.DataArray(weights, coords={'lat': lat}, dims=('lat',))
+
+
+def compute_spatial_weights(
+    lat: xr.DataArray,
+    lon: xr.DataArray,
+    gaussian_center_spec: Optional[dict] = None,
+    sigma_km: float = 1000.0
+) -> xr.DataArray:
+    """
+    Return spatial weights for the grid as an xr.DataArray (lat, lon) normalized so sum == 1.
+
+    If gaussian_center_spec is None, produce lat-only cos(lat) weights expanded to lon.
+    If gaussian_center_spec is provided, combine cos(lat) with gaussian spatial weight
+    computed via great-circle distance (haversine) with given sigma_km.
+
+    gaussian_center_spec expected keys: 'lat' and either 'lon_degwest' or 'lon_deg_east'.
+    Optionally the event config may include 'sigma_km' — this function accepts sigma_km parameter too.
+    """
+    lat1d = lat.values
+    lon1d = lon.values
+
+    if gaussian_center_spec is None:
+        # 1D lat weights expanded to 2D
+        w_lat_1d = compute_latitude_weights_1d(lat)
+        # Expand to 2D by adding lon dimension with the actual lon coordinate
+        w2d = w_lat_1d.expand_dims({'lon': lon})
+        # Ensure normalization sum==1
+        w2d = w2d / w2d.sum()
+        return w2d
+    else:
+        # build a clean center_spec for combine function (remove any sigma key)
+        center_spec = {k: v for k, v in gaussian_center_spec.items() if k in ('lat', 'lon_degwest', 'lon_deg_east')}
+        if 'lat' not in center_spec:
+            raise ValueError("gaussian_center spec must include 'lat' key")
+
+        # combine_lat_gaussian_weights expects 1D arrays for lon & lat
+        combined = combine_lat_gaussian_weights(
+            lat_1d=lat1d,
+            lon_1d=lon1d,
+            center_spec=center_spec,
+            sigma_km=sigma_km
+        )
+        # The returned 'combined' is normalized inside combine_lat_gaussian_weights
+        # but ensure coords align with input lat/lon xarray coords
+        # convert to have same coords/dims as data arrays (if not already)
+        combined = combined.rename({'lat': 'lat', 'lon': 'lon'})
+        return combined
 
 
 def _standardize_coords(ds: xr.Dataset) -> xr.DataArray:
@@ -120,28 +159,6 @@ def load_anomaly_data(
 
     When sliced_path is provided, loads that single file (already sliced in time/space).
     Otherwise loads full F01 anomaly files and slices to region in Python.
-    
-    Parameters
-    ----------
-    dataset : str
-        Dataset name: 'era5', 'mswx', or 'jra3q'
-    var : str
-        Variable name (e.g., 'psurf', 't2m', 'pres')
-    paths : dict
-        Data paths from get_data_paths()
-    region : dict
-        Event region with lat_min, lat_max, lon_min, lon_max (unused when sliced_path set)
-    year_range : tuple, optional
-        (start_year, end_year) to filter files. Ignored when sliced_path set.
-    sliced_path : Path, optional
-        Pre-sliced NetCDF from CDO. If set, loads this file directly.
-    verbose : bool
-        Print progress messages
-        
-    Returns
-    -------
-    xr.DataArray
-        Anomaly data sliced to event bounding box
     """
     if sliced_path is not None and sliced_path.exists():
         if verbose:
@@ -216,29 +233,13 @@ def load_anomaly_data(
 def compute_euclidean_distances(
     data: xr.DataArray,
     reference: xr.DataArray,
-    lat_weights: xr.DataArray
+    spatial_weights: xr.DataArray
 ) -> xr.DataArray:
     """
-    Compute latitude-weighted Euclidean distance between reference and all time steps.
-    
-    Distance formula: no square root as it is computationally heavy and meaningless
-        d(t) = sum_ij( w_j * (data(t,i,j) - ref(i,j))^2 )
-    
-    where w_j = cos(lat_j) / sum(cos(lat))
-    
-    Parameters
-    ----------
-    data : xr.DataArray
-        Data array with dimensions (time, lat, lon)
-    reference : xr.DataArray
-        Reference pattern with dimensions (lat, lon)
-    lat_weights : xr.DataArray
-        Normalized latitude weights with dimension (lat,)
-        
-    Returns
-    -------
-    xr.DataArray
-        Distance for each time step, dimension (time,)
+    Compute weighted sum of squared differences between reference and all time steps.
+
+    spatial_weights must be an xr.DataArray with dims ('lat','lon') and normalized
+    so that sum(spatial_weights) == 1. The function applies the weight element-wise.
     """
     # Compute difference (broadcasts reference over time dimension)
     diff = data - reference
@@ -246,8 +247,8 @@ def compute_euclidean_distances(
     # Square the differences
     diff_sq = diff ** 2
 
-    # Apply latitude weights (broadcasts over lon dimension)
-    weighted_diff_sq = diff_sq * lat_weights
+    # Apply spatial weights (broadcasts over time dimension)
+    weighted_diff_sq = diff_sq * spatial_weights
 
     # Sum over spatial dimensions
     sum_weighted_sq = weighted_diff_sq.sum(dim=['lat', 'lon'])
@@ -264,32 +265,7 @@ def select_time_separated_analogues(
 ) -> pd.DataFrame:
     """
     Select top N analogues with minimum time separation.
-    
-    This ensures analogues are not clustered in time (e.g., consecutive days
-    from the same weather pattern).
-    
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame with date and distance columns
-    n_analogues : int
-        Number of analogues to select
-    time_col : str
-        Name of the datetime column
-    distance_col : str
-        Name of the distance column
-    min_separation : pd.Timedelta
-        Minimum time separation between selected analogues
-        
-    Returns
-    -------
-    pd.DataFrame
-        Selected analogues with rank column
     """
-    # Sort by distance (ascending - smaller is better)
-    # !!! if it takes too long to sort, consider using a more sofisticated sort method
-    # https://leetcode.com/problems/largest-number/solutions/7508028/verrryyy-easssyyy-solution-beats-100-cc-y66we/
-
     df_sorted = df.sort_values(distance_col).reset_index(drop=True)
     
     chosen_indices = []
@@ -329,29 +305,6 @@ def find_analogues(
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Find analogue dates for a single event using snapshot_date as reference.
-    
-    Parameters
-    ----------
-    event : dict
-        Event configuration from extreme_events.yaml
-    dataset : str
-        Dataset name: 'era5', 'mswx', or 'jra3q'
-    paths : dict
-        Data paths from get_data_paths()
-    analogue_config : dict
-        Analogue search configuration
-    period : str, optional
-        'past', 'present', or None (both). If specified, only loads/processes
-        that period to save time and memory.
-    verbose : bool
-        Print progress messages
-        
-    Returns
-    -------
-    Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
-        - all_distances: DataFrame with all dates and distances
-        - past_analogues: DataFrame with top N past analogues (empty if period='present')
-        - present_analogues: DataFrame with top N present analogues (empty if period='past')
     """
     event_name = event['name']
     region = event['region']
@@ -415,7 +368,6 @@ def find_analogues(
         print(f"Min time separation: {min_separation}")
     
     # Path to CDO pre-sliced file (same location as cdo_slice.py writes).
-    # CDO slicing is done by the shell script before calling this; we just use the result if it exists.
     sliced_path = paths["data"] / "F02_analogue_search" / "sliced" / dataset / event_name / f"anomaly_{match_var}_sliced.nc"
     sliced_exists = sliced_path.exists()
     
@@ -452,8 +404,6 @@ def find_analogues(
     # #endregion
     
     # Get reference pattern from snapshot date
-    # If snapshot year is not in loaded data (e.g., processing past but snapshot is in present),
-    # load the reference separately
     snapshot_year = snapshot_date.year
     
     if verbose:
@@ -481,9 +431,48 @@ def find_analogues(
         print(f"Actual snapshot date used: {actual_snapshot.strftime('%Y-%m-%d')}")
         print(f"Reference pattern shape: {reference.shape}")
     
-    # Compute latitude weights
-    lat_weights = compute_latitude_weights(data_var.lat)
-    
+    # --------------------
+    # Compute spatial weights (lat * optional gaussian)
+    # --------------------
+    gaussian_spec = event.get('gaussian_center', None)
+    # default sigma
+    sigma_km = 1000.0
+    if isinstance(gaussian_spec, dict) and 'sigma_km' in gaussian_spec:
+        try:
+            sigma_km = float(gaussian_spec['sigma_km'])
+        except Exception:
+            sigma_km = 1000.0
+
+    # If gaussian_spec exists, pass it directly to compute_spatial_weights; the helper
+    # will validate presence of 'lat' and either 'lon_degwest' or 'lon_deg_east'.
+    spatial_weights = compute_spatial_weights(
+        lat=data_var.lat,
+        lon=data_var.lon,
+        gaussian_center_spec=gaussian_spec,
+        sigma_km=sigma_km
+    )
+
+    # #region agent log - H2b: weight debugging info
+    try:
+        # compute approximate center of mass of weights for debugging
+        lat_vals = spatial_weights.sum(dim='lon') * spatial_weights.lat
+        lon_vals = spatial_weights.sum(dim='lat') * spatial_weights.lon
+        # note: these are xarray objects; extract scalar approximations
+        approx_lat = float((spatial_weights * spatial_weights.lat).sum()/spatial_weights.sum())
+        approx_lon = float((spatial_weights * spatial_weights.lon).sum()/spatial_weights.sum())
+    except Exception:
+        approx_lat = None
+        approx_lon = None
+
+    debug_log("H2b", "analogue_search.py:find_analogues", "Spatial weights computed", {
+        "gaussian_spec_provided": bool(gaussian_spec),
+        "sigma_km": sigma_km,
+        "approx_center_lat": approx_lat,
+        "approx_center_lon": approx_lon,
+        "weights_sum": float(spatial_weights.sum().values)
+    })
+    # #endregion
+
     # Compute distances to all time steps
     if verbose:
         print(f"\nComputing distances to all {len(data_var.time)} time steps...")
@@ -491,7 +480,7 @@ def find_analogues(
         import sys
         sys.stdout.flush()
     
-    distances = compute_euclidean_distances(data_var, reference, lat_weights)
+    distances = compute_euclidean_distances(data_var, reference, spatial_weights)
     
     # Trigger computation (if using dask) with progress bar
     if verbose:
@@ -597,28 +586,6 @@ def process_event(
 ) -> bool:
     """
     Process analogue search for a single event and save results.
-    
-    Parameters
-    ----------
-    event : dict
-        Event configuration
-    dataset : str
-        Dataset name
-    paths : dict
-        Data paths
-    analogue_config : dict
-        Analogue configuration
-    period : str, optional
-        'past', 'present', or None (both)
-    skip_existing : bool
-        Skip if output exists
-    verbose : bool
-        Print progress
-        
-    Returns
-    -------
-    bool
-        True if successful
     """
     event_name = event['name']
     
@@ -684,22 +651,6 @@ def process_all_events(
 ) -> bool:
     """
     Process analogue search for all events.
-    
-    Parameters
-    ----------
-    dataset : str
-        Dataset name: 'era5', 'mswx', or 'jra3q'
-    period : str, optional
-        'past', 'present', or None (both)
-    skip_existing : bool
-        Skip if output exists
-    verbose : bool
-        Print progress
-        
-    Returns
-    -------
-    bool
-        True if all events processed successfully
     """
     # Load configurations
     env = load_env_setting()

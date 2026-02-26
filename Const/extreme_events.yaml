@@ -18,6 +18,10 @@ events:
       lat_max: -55.0
       lon_min: 225.0   # -135 + 360
       lon_max: 325.0   # -35 + 360
+    gaussian_center:
+      lat: -68.0
+      lon_deg_east: 296.0   # -64 + 360
+      sigma_km: 1000.0
     boxplot_region:
       lat_min: -70.0   # 70S
       lat_max: -60.0   # 60S
@@ -36,6 +40,10 @@ events:
       lat_max: -55.0
       lon_min: 225.0   # -135 + 360
       lon_max: 325.0   # -35 + 360
+    gaussian_center:
+      lat: -68.0
+      lon_deg_east: 296.0   # -64 + 360
+      sigma_km: 1000.0
     boxplot_region:
       lat_min: -70.0   # 70S
       lat_max: -60.0   # 60S
@@ -54,6 +62,10 @@ events:
       lat_max: -55.0
       lon_min: 225.0   # -135 + 360
       lon_max: 325.0   # -35 + 360
+    gaussian_center:
+      lat: -68.0
+      lon_deg_east: 296.0   # -64 + 360
+      sigma_km: 1000.0
     boxplot_region:
       lat_min: -70.0   # 70S
       lat_max: -60.0   # 60S
