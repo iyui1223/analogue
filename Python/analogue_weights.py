@@ -37,7 +37,7 @@ from data_utils import (
 from spatial_weights import compute_spatial_weights
 
 # #region agent log - Debug logging helper
-DEBUG_LOG = Path.home() / "andante/cenv1201/proj/analogue/.cursor/debug.log"
+DEBUG_LOG = Path.home() / ".cursor/debug.log"
 
 def debug_log(hypothesis_id: str, location: str, message: str, data: dict):
     """Append debug log entry to NDJSON file."""
@@ -97,28 +97,6 @@ def load_anomaly_data(
 
     When sliced_path is provided, loads that single file (already sliced in time/space).
     Otherwise loads full F01 anomaly files and slices to region in Python.
-    
-    Parameters
-    ----------
-    dataset : str
-        Dataset name: 'era5', 'mswx', or 'jra3q'
-    var : str
-        Variable name (e.g., 'psurf', 't2m', 'pres')
-    paths : dict
-        Data paths from get_data_paths()
-    region : dict
-        Event region with lat_min, lat_max, lon_min, lon_max (unused when sliced_path set)
-    year_range : tuple, optional
-        (start_year, end_year) to filter files. Ignored when sliced_path set.
-    sliced_path : Path, optional
-        Pre-sliced NetCDF from CDO. If set, loads this file directly.
-    verbose : bool
-        Print progress messages
-        
-    Returns
-    -------
-    xr.DataArray
-        Anomaly data sliced to event bounding box
     """
     if sliced_path is not None and sliced_path.exists():
         if verbose:
@@ -196,29 +174,24 @@ def compute_euclidean_distances(
     spatial_weights: xr.DataArray
 ) -> xr.DataArray:
     """
-    Compute spatial-weighted Euclidean distance between reference and all time steps.
+    Compute weighted sum of squared differences between reference and all time steps.
 
-    Distance formula (no square root): d(t) = sum_ij( w_ij * (data(t,i,j) - ref(i,j))^2 )
-    where spatial_weights w_ij are normalized (sum == 1).
-
-    Parameters
-    ----------
-    data : xr.DataArray
-        Data array with dimensions (time, lat, lon)
-    reference : xr.DataArray
-        Reference pattern with dimensions (lat, lon)
-    spatial_weights : xr.DataArray
-        Normalized spatial weights with dims (lat, lon), sum == 1
-
-    Returns
-    -------
-    xr.DataArray
-        Distance for each time step, dimension (time,)
+    spatial_weights must be an xr.DataArray with dims ('lat','lon') and normalized
+    so that sum(spatial_weights) == 1. The function applies the weight element-wise.
     """
+    # Compute difference (broadcasts reference over time dimension)
     diff = data - reference
+
+    # Square the differences
     diff_sq = diff ** 2
+
+    # Apply spatial weights (broadcasts over time dimension)
     weighted_diff_sq = diff_sq * spatial_weights
-    return weighted_diff_sq.sum(dim=['lat', 'lon'])
+
+    # Sum over spatial dimensions
+    sum_weighted_sq = weighted_diff_sq.sum(dim=['lat', 'lon'])
+
+    return sum_weighted_sq
 
 
 def select_time_separated_analogues(
@@ -230,29 +203,7 @@ def select_time_separated_analogues(
 ) -> pd.DataFrame:
     """
     Select top N analogues with minimum time separation.
-    
-    This ensures analogues are not clustered in time (e.g., consecutive days
-    from the same weather pattern).
-    
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame with date and distance columns
-    n_analogues : int
-        Number of analogues to select
-    time_col : str
-        Name of the datetime column
-    distance_col : str
-        Name of the distance column
-    min_separation : pd.Timedelta
-        Minimum time separation between selected analogues
-        
-    Returns
-    -------
-    pd.DataFrame
-        Selected analogues with rank column
     """
-
     df_sorted = df.sort_values(distance_col).reset_index(drop=True)
     
     chosen_indices = []
@@ -292,29 +243,6 @@ def find_analogues(
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Find analogue dates for a single event using snapshot_date as reference.
-    
-    Parameters
-    ----------
-    event : dict
-        Event configuration from extreme_events.yaml
-    dataset : str
-        Dataset name: 'era5', 'mswx', or 'jra3q'
-    paths : dict
-        Data paths from get_data_paths()
-    analogue_config : dict
-        Analogue search configuration
-    period : str, optional
-        'past', 'present', or None (both). If specified, only loads/processes
-        that period to save time and memory.
-    verbose : bool
-        Print progress messages
-        
-    Returns
-    -------
-    Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
-        - all_distances: DataFrame with all dates and distances
-        - past_analogues: DataFrame with top N past analogues (empty if period='present')
-        - present_analogues: DataFrame with top N present analogues (empty if period='past')
     """
     event_name = event['name']
     region = event['region']
@@ -378,7 +306,6 @@ def find_analogues(
         print(f"Min time separation: {min_separation}")
     
     # Path to CDO pre-sliced file (same location as cdo_slice.py writes).
-    # CDO slicing is done by the shell script before calling this; we just use the result if it exists.
     sliced_path = paths["data"] / "F02_analogue_search" / "sliced" / dataset / event_name / f"anomaly_{match_var}_sliced.nc"
     sliced_exists = sliced_path.exists()
     
@@ -415,8 +342,6 @@ def find_analogues(
     # #endregion
     
     # Get reference pattern from snapshot date
-    # If snapshot year is not in loaded data (e.g., processing past but snapshot is in present),
-    # load the reference separately
     snapshot_year = snapshot_date.year
     
     if verbose:
@@ -443,21 +368,48 @@ def find_analogues(
     if verbose:
         print(f"Actual snapshot date used: {actual_snapshot.strftime('%Y-%m-%d')}")
         print(f"Reference pattern shape: {reference.shape}")
-
-    # Compute spatial weights (cos(lat) * optional Gaussian via great-circle distance)
+    
+    # --------------------
+    # Compute spatial weights (lat * optional gaussian)
+    # --------------------
     gaussian_spec = event.get('gaussian_center', None)
+    # default sigma
     sigma_km = 1000.0
     if isinstance(gaussian_spec, dict) and 'sigma_km' in gaussian_spec:
         try:
             sigma_km = float(gaussian_spec['sigma_km'])
-        except (TypeError, ValueError):
+        except Exception:
             sigma_km = 1000.0
+
+    # If gaussian_spec exists, pass it directly to compute_spatial_weights; the helper
+    # will validate presence of 'lat' and either 'lon_degwest' or 'lon_deg_east'.
     spatial_weights = compute_spatial_weights(
         lat=data_var.lat,
         lon=data_var.lon,
         gaussian_center_spec=gaussian_spec,
         sigma_km=sigma_km
     )
+
+    # #region agent log - H2b: weight debugging info
+    try:
+        # compute approximate center of mass of weights for debugging
+        lat_vals = spatial_weights.sum(dim='lon') * spatial_weights.lat
+        lon_vals = spatial_weights.sum(dim='lat') * spatial_weights.lon
+        # note: these are xarray objects; extract scalar approximations
+        approx_lat = float((spatial_weights * spatial_weights.lat).sum()/spatial_weights.sum())
+        approx_lon = float((spatial_weights * spatial_weights.lon).sum()/spatial_weights.sum())
+    except Exception:
+        approx_lat = None
+        approx_lon = None
+
+    debug_log("H2b", "analogue_search.py:find_analogues", "Spatial weights computed", {
+        "gaussian_spec_provided": bool(gaussian_spec),
+        "sigma_km": sigma_km,
+        "approx_center_lat": approx_lat,
+        "approx_center_lon": approx_lon,
+        "weights_sum": float(spatial_weights.sum().values)
+    })
+    # #endregion
 
     # Compute distances to all time steps
     if verbose:
@@ -568,50 +520,42 @@ def process_event(
     analogue_config: Dict[str, Any],
     period: Optional[str] = None,
     skip_existing: bool = True,
-    verbose: bool = True
+    verbose: bool = True,
+    sigma_km_override: Optional[float] = None
 ) -> bool:
     """
     Process analogue search for a single event and save results.
-    
-    Parameters
-    ----------
-    event : dict
-        Event configuration
-    dataset : str
-        Dataset name
-    paths : dict
-        Data paths
-    analogue_config : dict
-        Analogue configuration
-    period : str, optional
-        'past', 'present', or None (both)
-    skip_existing : bool
-        Skip if output exists
-    verbose : bool
-        Print progress
-        
-    Returns
-    -------
-    bool
-        True if successful
     """
     event_name = event['name']
     
     # Output directory includes dataset name
     output_dir = ensure_dir(paths['analogue'] / dataset / event_name)
     
-    # Output files - add period suffix if processing single period
+    # Output files - add sigma suffix if overriding (for sensitivity test)
+    if sigma_km_override is not None:
+        sigma_suffix = f"_{int(sigma_km_override)}km"
+    else:
+        sigma_suffix = ""
     suffix = f"_{period}" if period else ""
-    distances_file = output_dir / f'all_distances{suffix}.csv'
-    past_file = output_dir / f'past_analogues{suffix}.csv'
-    present_file = output_dir / f'present_analogues{suffix}.csv'
-    combined_file = output_dir / f'analogues{suffix}.csv'
+    distances_file = output_dir / f'all_distances{sigma_suffix}{suffix}.csv'
+    past_file = output_dir / f'past_analogues{sigma_suffix}{suffix}.csv'
+    present_file = output_dir / f'present_analogues{sigma_suffix}{suffix}.csv'
+    combined_file = output_dir / f'analogues{sigma_suffix}{suffix}.csv'
     
     # Check if can skip
     if skip_existing and combined_file.exists():
         if verbose:
             print(f"[{event_name}] Output exists, skipping: {combined_file}")
         return True
+    
+    # Override sigma_km in event config if provided
+    if sigma_km_override is not None:
+        event = event.copy()
+        if 'gaussian_center' not in event:
+            event['gaussian_center'] = {}
+        else:
+            event['gaussian_center'] = event['gaussian_center'].copy()
+        event['gaussian_center']['sigma_km'] = sigma_km_override
     
     try:
         # Find analogues
@@ -659,22 +603,6 @@ def process_all_events(
 ) -> bool:
     """
     Process analogue search for all events.
-    
-    Parameters
-    ----------
-    dataset : str
-        Dataset name: 'era5', 'mswx', or 'jra3q'
-    period : str, optional
-        'past', 'present', or None (both)
-    skip_existing : bool
-        Skip if output exists
-    verbose : bool
-        Print progress
-        
-    Returns
-    -------
-    bool
-        True if all events processed successfully
     """
     # Load configurations
     env = load_env_setting()
@@ -757,6 +685,12 @@ def main():
         action='store_true',
         help='Suppress verbose output'
     )
+    parser.add_argument(
+        '--sigma_km',
+        type=float,
+        default=None,
+        help='Override sigma_km for Gaussian weighting (for sensitivity testing)'
+    )
     args = parser.parse_args()
     
     skip_existing = not args.force
@@ -766,6 +700,8 @@ def main():
     print("Analogue Search Pipeline")
     print("=" * 60)
     print(f"Dataset: {args.dataset}")
+    if args.sigma_km:
+        print(f"Sigma override: {args.sigma_km} km")
     if args.period:
         print(f"Period: {args.period} only")
     
@@ -799,7 +735,8 @@ def main():
                 analogue_config=analogue_config,
                 period=args.period,
                 skip_existing=skip_existing,
-                verbose=verbose
+                verbose=verbose,
+                sigma_km_override=args.sigma_km
             )
         else:
             # Process all events
