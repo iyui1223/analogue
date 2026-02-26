@@ -6,7 +6,7 @@
 
 # === Antarctic Peninsula: DJFM (Dec, Jan, Feb, Mar) for 2022 event + analogues ===
 # Shares era5_daily_peninsula with 2020; adds months 12,1,2,3 for analogue dates
-OUTPUT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/quick_event_analysis/antarctica_peninsula_2022/dataslices/era5_daily_peninsula"
+OUTPUT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue/Data/data_slice/Tsurf_max_Antarctic-Peninsula"
 
 source /lustre/soge1/projects/andante/cenv1201/venvs/template/bin/activate
 
@@ -25,5 +25,5 @@ export FREQUENCY="6_hourly"
 export VARIABLES="2m_temperature"
 # export FORCE=1
 
-python "/lustre/soge1/projects/andante/cenv1201/proj/quick_event_analysis/antarctica_peninsula_2022/dataslices/download.py"
+python "/lustre/soge1/projects/andante/cenv1201/proj/analogue/Data/download.py"
 

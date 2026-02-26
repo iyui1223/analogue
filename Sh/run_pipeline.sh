@@ -112,7 +112,7 @@ esac
 get_preprocess_script() {
     local ds=$1
     case "$ds" in
-        era5)  echo "${SCRIPT_DIR}/preprocess_era5_slurm.sh" ;;
+        era5)  echo "${SCRIPT_DIR}/F01_download_era5_slurm.sh" ;;
         mswx)  echo "${SCRIPT_DIR}/preprocess_mswx_slurm.sh" ;;
         jra3q) echo "${SCRIPT_DIR}/preprocess_jra3q_slurm.sh" ;;
     esac

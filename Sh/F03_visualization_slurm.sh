@@ -17,7 +17,8 @@
 #   2. Tsurfdiff.sh        — Tsurf difference maps: analogue minus original (GrADS)
 #   3. spaghetti.sh        — Z500 spaghetti plots (GrADS)
 #   4. t2m_boxplot.sh      — T2m box-and-whisker by lead time (Python)
-#   5. index_scatter.sh    — Climate index scatter plots (Python)
+#   5. cvm_test.sh         — Cramér–von Mises test (past vs present, Python)
+#   6. index_scatter.sh    — Climate index scatter plots (Python)
 #
 # Usage:
 #   sbatch F03_visualization_slurm.sh                                  # defaults
@@ -28,16 +29,16 @@
 #   SKIP_TSURFDIFF=1 sbatch ...                        # skip Tsurf difference maps
 #   SKIP_SPAGHETTI=1 sbatch ...                        # skip spaghetti plots
 #   SKIP_BOXPLOT=1 sbatch ...                          # skip T2m box plot
+#   SKIP_CVM=1 sbatch ...                              # skip CvM test
 #   SKIP_SCATTER=1 sbatch ...                          # skip index scatter
 #
-# Ensemble size for box plot (default 5):
-#   NTOP=7 sbatch F03_visualization_slurm.sh
+# Ensemble size: NTOP=7 (box plot, default 5), NMEMBERS=15 (CvM test, default 15)
 # =============================================================================
 
 set -eox
 
 # Use actual lustre path (not symlink) for SLURM compatibility
-ROOT_DIR="/soge-home/users/cenv1201/andante/cenv1201/proj/analogue_gaussian/analogue/
+ROOT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue"
 source "${ROOT_DIR}/Const/env_setting.sh"
 
 # override the default paths as those are not visible from CPU nodes
@@ -51,8 +52,10 @@ SKIP_TSURF="${SKIP_TSURF:-1}"
 SKIP_TSURFDIFF="${SKIP_TSURFDIFF:-1}"
 SKIP_SPAGHETTI="${SKIP_SPAGHETTI:-0}"
 SKIP_BOXPLOT="${SKIP_BOXPLOT:-0}"
+SKIP_CVM="${SKIP_CVM:-0}"
 SKIP_SCATTER="${SKIP_SCATTER:-1}"
 NTOP="${NTOP:-5}"
+NMEMBERS="${NMEMBERS:-15}"
 
 echo "============================================================"
 echo "F03: Visualization Pipeline — Master Dispatcher"
@@ -63,8 +66,10 @@ echo "Skip Tsurf:       $SKIP_TSURF"
 echo "Skip Tsurfdiff:   $SKIP_TSURFDIFF"
 echo "Skip Spaghetti:   $SKIP_SPAGHETTI"
 echo "Skip Boxplot:     $SKIP_BOXPLOT"
+echo "Skip CvM:         $SKIP_CVM"
 echo "Skip Scatter:     $SKIP_SCATTER"
 echo "Boxplot N top:    $NTOP"
+echo "CvM N members:    $NMEMBERS"
 echo "============================================================"
 
 cd "${ROOT_DIR}/Sh"
@@ -129,7 +134,20 @@ else
 fi
 
 # -------------------------------------------------------
-# 5. Climate index scatter plots
+# 5. Cramér–von Mises test (past vs present)
+# -------------------------------------------------------
+if [ "$SKIP_CVM" != "1" ]; then
+    echo ""
+    echo ">>> Running cvm_test.sh (CvM past vs present)..."
+    echo "------------------------------------------------------------"
+    ./cvm_test.sh $ARGS --nmembers $NMEMBERS || echo "[WARN] cvm_test.sh exited with non-zero status"
+else
+    echo ""
+    echo ">>> Skipping CvM test (SKIP_CVM=1)"
+fi
+
+# -------------------------------------------------------
+# 6. Climate index scatter plots
 # -------------------------------------------------------
 if [ "$SKIP_SCATTER" != "1" ]; then
     echo ""

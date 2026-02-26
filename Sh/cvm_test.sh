@@ -1,21 +1,21 @@
 #!/bin/bash
 # =============================================================================
-# t2m_boxplot: T2m Box-and-Whisker by Lead Time for Analogue Members
+# cvm_test: Cramér–von Mises test (past vs present analogue T2m distributions)
 # =============================================================================
-# Generates T2m box plots showing past/present analogue spread vs target event.
-# Uses pre-sliced data (Data/data_slice) for fast loading.
+# Uses snapshot-date daily max T2m (domain mean over land in boxplot_region).
+# Two tests: 1) CvM asymptotic, 2) Permutation + CvM.
 #
 # Usage:
-#   ./t2m_boxplot.sh --dataset era5 --event antarctica_peninsula_2020
-#   ./t2m_boxplot.sh --dataset era5 --event antarctica_peninsula_2020 --ntop 5
+#   ./cvm_test.sh --dataset era5 --event antarctica_peninsula_2020
+#   NMEMBERS=10 ./cvm_test.sh --dataset era5 --event antarctica_peninsula_2020
 #
 # Reads:
-#   - Const/extreme_events.yaml (event definitions)
+#   - Const/extreme_events.yaml (boxplot_region)
 #   - Data/F02_analogue_search/{dataset}/{event}/analogues.csv
-#   - Data/data_slice/YYYYMM.nc (monthly T2m, absolute path)
+#   - Data/data_slice/YYYYMM.nc (daily max T2m)
 #
 # Output:
-#   Figs/F03_visualization/{event}/{dataset}/t2m_boxplot_top{N}.png
+#   Figs/F03_visualization/{event}/{dataset}/cvm_test_results.txt
 # =============================================================================
 
 set -eox
@@ -28,15 +28,13 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 source "${ROOT_DIR}/Const/env_setting.sh"
 
-CONST_DIR="${ROOT_DIR}/Const"
 PYTHON_DIR="${ROOT_DIR}/Python"
 FIGS_BASE="${ROOT_DIR}/Figs/F03_visualization"
 
 DATASET="${DATASET:-era5}"
 EVENT="${EVENT:-}"
-NTOP="${NTOP:-5}"
+NMEMBERS="${NMEMBERS:-15}"
 
-# Absolute paths (no symlinks)
 DATA_SLICE_DIR="${DATA_SLICE_DIR:-${ROOT_DIR}/Data/data_slice/Tsurf_max_Antarctic-Peninsula}"
 EVENTS_FILE="${ROOT_DIR}/Const/extreme_events.yaml"
 
@@ -45,11 +43,11 @@ EVENTS_FILE="${ROOT_DIR}/Const/extreme_events.yaml"
 # -----------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --dataset)  DATASET="$2";  shift 2 ;;
-        --event)    EVENT="$2";    shift 2 ;;
-        --ntop)     NTOP="$2";     shift 2 ;;
+        --dataset)   DATASET="$2";   shift 2 ;;
+        --event)     EVENT="$2";     shift 2 ;;
+        --nmembers)  NMEMBERS="$2";  shift 2 ;;
         --help|-h)
-            echo "Usage: $0 --dataset DATASET --event EVENT [--ntop N]"
+            echo "Usage: $0 --dataset DATASET --event EVENT [--nmembers N]"
             exit 0 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
@@ -77,35 +75,33 @@ if [ ! -f "$ANALOGUES_FILE" ]; then
     exit 1
 fi
 
-mkdir -p "$OUTPUT_DIR"
-
 echo "============================================================"
-echo "t2m_boxplot: T2m Box-and-Whisker by Lead Time"
+echo "cvm_test: Cramér–von Mises (past vs present)"
 echo "============================================================"
 echo "Event:      $EVENT"
 echo "Dataset:    $DATASET"
 echo "Data dir:   $DATA_SLICE_DIR"
-echo "Top N:      $NTOP"
+echo "Members:    $NMEMBERS"
 echo "Output:     $OUTPUT_DIR"
 echo "============================================================"
 
 # -----------------------------------------------------------------------------
 # Run Python script
 # -----------------------------------------------------------------------------
-PY_SCRIPT="${PYTHON_DIR}/plot_t2m_boxplot.py"
+PY_SCRIPT="${PYTHON_DIR}/cvm_test.py"
 
 if [ ! -f "$PY_SCRIPT" ]; then
     echo "ERROR: ${PY_SCRIPT} not found."
     exit 1
 fi
 
-BOXPLOT_ARGS="--data-dir $DATA_SLICE_DIR --analogues $ANALOGUES_FILE --events-yaml $EVENTS_FILE --event $EVENT --outdir $OUTPUT_DIR --ntop $NTOP"
-# Optional: skip land mask (default: use land only)
-[ "${NO_LAND_MASK:-0}" = "1" ] && BOXPLOT_ARGS="$BOXPLOT_ARGS --no-land-mask"
+CVM_ARGS="--data-dir $DATA_SLICE_DIR --analogues $ANALOGUES_FILE --events-yaml $EVENTS_FILE --event $EVENT --outdir $OUTPUT_DIR --nmembers $NMEMBERS"
+[ "${NO_LAND_MASK:-0}" = "1" ] && CVM_ARGS="$CVM_ARGS --no-land-mask"
+[ -n "${NPERM:-}" ] && CVM_ARGS="$CVM_ARGS --nperm $NPERM"
 
-python3 "$PY_SCRIPT" $BOXPLOT_ARGS
+python3 "$PY_SCRIPT" $CVM_ARGS
 
 echo ""
 echo "============================================================"
-echo "t2m_boxplot complete."
+echo "cvm_test complete."
 echo "============================================================"

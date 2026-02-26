@@ -31,6 +31,9 @@ source "${ROOT_DIR}/Const/env_setting.sh"
 
 GRADS_DIR="${ROOT_DIR}/GrADS"
 FIGS_BASE="${ROOT_DIR}/Figs/F03_visualization"
+ERA5_DAILY="${ERA5_DIR}/daily"
+# Fallback: daily MEAN slices (F01), not data_slice (daily max)
+DATA_SLICE_MEAN_DIR="${F01_ERA5_SLICES:-${ROOT_DIR}/Data/F01_preprocess/era5/slices}"
 
 DATASET="${DATASET:-era5}"
 EVENT="${EVENT:-}"
@@ -60,9 +63,8 @@ if [ -z "$EVENT" ]; then
     exit 1
 fi
 
-if [ -z "$CTL_DIR" ] || [ ! -d "$CTL_DIR" ]; then
-    echo "ERROR: GRADS_CTL_DIR not set or directory not found: $CTL_DIR"
-    echo "Please set GRADS_CTL_DIR in Const/env_setting.sh"
+if { [ -z "$CTL_DIR" ] || [ ! -d "$CTL_DIR" ]; } && [ ! -d "$DATA_SLICE_MEAN_DIR" ]; then
+    echo "ERROR: Need either GRADS_CTL_DIR or F01_ERA5_SLICES for Tsurfdiff"
     exit 1
 fi
 
@@ -117,6 +119,27 @@ echo "Window days: +/-${WINDOW_DAYS} (total frames per date: $((WINDOW_DAYS*2+1)
 echo "============================================================"
 
 # -----------------------------------------------------------------------------
+# resolve_t2m_msl: for date YYYY-MM-DD, return "T2M_PATH MSL_PATH"
+#   Uses ERA5 yearly files when available; else data_slice/YYYYMM.nc for T2m, NONE for MSL
+# -----------------------------------------------------------------------------
+resolve_t2m_msl() {
+    local d="$1"
+    local year="${d:0:4}"
+    local month="${d:5:2}"
+    local t2m="${ERA5_DAILY}/2m_temperature/nc/era5_daily_2m_temperature_${year}.nc"
+    local msl="${ERA5_DAILY}/mean_sea_level_pressure/nc/era5_daily_mean_sea_level_pressure_${year}.nc"
+    local slice="${DATA_SLICE_MEAN_DIR}/${year}${month}.nc"
+    if [ -f "$t2m" ]; then
+        [ -f "$msl" ] || msl="NONE"
+        echo "$t2m $msl"
+    elif [ -f "$slice" ]; then
+        echo "$slice NONE"
+    else
+        echo "NONE NONE"
+    fi
+}
+
+# -----------------------------------------------------------------------------
 # offset_sortable: convert signed offset to alphabetically-sortable string
 #   e.g. with WINDOW=7: -7->a-7, -6->b-6, ..., 0->h0, 1->i1, ..., 7->o7
 # -----------------------------------------------------------------------------
@@ -148,6 +171,7 @@ print(dt.strftime('%Y-%m-%d'))
 
 # -----------------------------------------------------------------------------
 # Plot function: generate a single Tsurfdiff image
+#   Uses ctl template when both dates have ERA5 yearly data; else data_slice fallback (files mode)
 # -----------------------------------------------------------------------------
 plot_diff() {
     local analogue_date="$1"  # analogue base date (e.g. 1960-03-10)
@@ -160,6 +184,19 @@ plot_diff() {
     orig_target=$(date_shift "$SNAPSHOT" "$offset") || { echo "  [SKIP] date_shift failed for SNAPSHOT offset $offset"; return 1; }
     anal_target=$(date_shift "$analogue_date" "$offset") || { echo "  [SKIP] date_shift failed for $analogue_date offset $offset"; return 1; }
 
+    # Resolve paths for both dates
+    local orig_paths anal_paths
+    orig_paths=($(resolve_t2m_msl "$orig_target"))
+    anal_paths=($(resolve_t2m_msl "$anal_target"))
+    local orig_t2m="${orig_paths[0]}" orig_msl="${orig_paths[1]}"
+    local anal_t2m="${anal_paths[0]}" anal_msl="${anal_paths[1]}"
+
+    # Need at least T2m for both dates
+    if [ "$orig_t2m" = "NONE" ] || [ "$anal_t2m" = "NONE" ]; then
+        echo "  [SKIP] ${period}_${idx}_${offset}: no T2m data for orig=$orig_target or anal=$anal_target"
+        return 1
+    fi
+
     # Build output filename
     printf -v idx_padded "%03d" "$idx"
     local offset_str
@@ -168,11 +205,22 @@ plot_diff() {
 
     echo "  ${period}_${idx_padded}_${offset_str}: orig=${orig_target} anal=${anal_target} (base ${analogue_date}, offset ${offset})"
 
-    # Safely quote the description for GrADS
     local safe_desc="${DESCRIPTION//\'/\'\\\'\'}"
 
     cd "$GRADS_DIR"
-    $GRADS -blcx "run plot_Tsurfdiff.gs $CTL_DIR $orig_target $anal_target $period $LON1 $LON2 $LAT1 $LAT2 $output '$safe_desc'" 2>&1 | grep -E "^(Saved|ERROR)" || true
+
+    # Use ctl mode only when both dates have ERA5 yearly files (path contains ERA5_DAILY)
+    local use_ctl=0
+    if [ -n "$CTL_DIR" ] && [ -d "$CTL_DIR" ] && \
+       [[ "$orig_t2m" == *"${ERA5_DAILY}"* ]] && [[ "$anal_t2m" == *"${ERA5_DAILY}"* ]]; then
+        use_ctl=1
+    fi
+
+    if [ "$use_ctl" = "1" ]; then
+        $GRADS -blcx "run plot_Tsurfdiff.gs $CTL_DIR $orig_target $anal_target $period $LON1 $LON2 $LAT1 $LAT2 $output '$safe_desc'" 2>&1 | grep -E "^(Saved|ERROR)" || true
+    else
+        $GRADS -blcx "run plot_Tsurfdiff_files.gs $orig_t2m ${orig_msl:-NONE} $anal_t2m ${anal_msl:-NONE} $orig_target $anal_target $period $LON1 $LON2 $LAT1 $LAT2 $output '$safe_desc'" 2>&1 | grep -E "^(Saved|ERROR)" || true
+    fi
 
     [ -f "$output" ] && echo "    -> $(basename "$output")" || echo "    -> FAILED"
 }

@@ -3,7 +3,8 @@
 ERA5 daily stats downloader (monthly files as YYYYMM.nc)
 
 - Dataset: derived-era5-single-levels-daily-statistics
-- Variables: 10m u/v wind + 2m temperature (daily_mean) for Antarctic Peninsula slice
+- Use case: daily_maximum t2m for box plot (Data/data_slice) — keep as is.
+- For F01 daily MEAN slices (msl, t2m, d2m, sst, u10, v10, tp), use Python/download_era5_slices.py
 - Area: 90°W–40°W, 75°S–65°S (CDS order: N,W,S,E = -65,-90,-75,-40)
 - Loops from START_YEAR (env) or 1948; MONTHS (env) e.g. "2" = February only
 - Saves to OUTPUT_DIR (env); skips existing files unless FORCE=1

@@ -63,14 +63,20 @@ file_num = file_num + 1
 t2m_fnum = file_num
 say 'Opened T2M as file ' % t2m_fnum
 
-'sdfopen ' % mslp_file
-if (rc != 0)
-  say 'ERROR: Cannot open MSLP file'
-  return
+has_mslp = 0
+if (mslp_file != 'NONE')
+  'sdfopen ' % mslp_file
+  if (rc = 0)
+    file_num = file_num + 1
+    mslp_fnum = file_num
+    has_mslp = 1
+    say 'Opened MSLP as file ' % mslp_fnum
+  else
+    say 'WARN: MSLP file not found or unreadable (skipping MSLP layer): ' % mslp_file
+  endif
+else
+  say 'MSLP NONE - skipping MSLP contours (data_slice fallback mode)'
 endif
-file_num = file_num + 1
-mslp_fnum = file_num
-say 'Opened MSLP as file ' % mslp_fnum
 
 has_wind = 0
 if (uwind_file != 'NONE' & vwind_file != 'NONE')
@@ -149,21 +155,23 @@ say 'Layer 1: Temperature shading...'
 'd t2m-273.15'
 
 * =============================================================================
-* Layer 2: Mean Sea Level Pressure contours (gray lines)
+* Layer 2: Mean Sea Level Pressure contours (gray lines, if available)
 * =============================================================================
-say 'Layer 2: MSLP contours...'
-'set dfile ' % mslp_fnum
-'set t 1'
-'q file ' % mslp_fnum
-'set time ' % grads_time
+if (has_mslp = 1)
+  say 'Layer 2: MSLP contours...'
+  'set dfile ' % mslp_fnum
+  'set t 1'
+  'q file ' % mslp_fnum
+  'set time ' % grads_time
 
-'set gxout contour'
-'set cint 4'
-'set cthick 4'
-'set ccolor 15'
-'set clab on'
-'set clskip 2'
-'d msl/100'
+  'set gxout contour'
+  'set cint 4'
+  'set cthick 4'
+  'set ccolor 15'
+  'set clab on'
+  'set clskip 2'
+  'd msl/100'
+endif
 
 * =============================================================================
 * Layer 3: 0 deg C Isotherm (ice-blue line)

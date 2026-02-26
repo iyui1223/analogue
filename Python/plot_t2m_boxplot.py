@@ -99,9 +99,13 @@ def load_land_mask(
         lsm = lsm.astype(np.float64) * sf + ao
     lon = lsm.coords["longitude"]
     lon_0_360 = float(lon.min()) >= 0
-    # bbox lon is 0–360; LSM uses 0–360, so use as-is (or +360 if stored as -180–180)
-    lon_lo = lon_min + 360 if (lon_0_360 and lon_min < 0) else lon_min
-    lon_hi = lon_max + 360 if (lon_0_360 and lon_max < 0) else lon_max
+    # bbox lon is 0–360; convert to LSM convention for selection
+    if lon_0_360:
+        lon_lo, lon_hi = lon_min, lon_max
+    else:
+        # LSM uses -180 to 180; convert bbox 0–360 -> -180–180
+        lon_lo = lon_min - 360 if lon_min > 180 else lon_min
+        lon_hi = lon_max - 360 if lon_max > 180 else lon_max
     # LSM lat typically -90 to 90 (increasing); use slice(lat_min, lat_max)
     lsm_sub = lsm.sel(
         latitude=slice(lat_min, lat_max),
