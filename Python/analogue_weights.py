@@ -34,11 +34,7 @@ from data_utils import (
     ensure_dir,
 )
 
-from analogue_weights import (
-    great_circle_distance_km,
-    compute_gaussian_weights,
-    combine_lat_gaussian_weights,
-)
+from spatial_weights import compute_spatial_weights
 
 # #region agent log - Debug logging helper
 DEBUG_LOG = Path.home() / "andante/cenv1201/proj/analogue/.cursor/debug.log"
@@ -56,64 +52,6 @@ def debug_log(hypothesis_id: str, location: str, message: str, data: dict):
     with open(DEBUG_LOG, 'a') as f:
         f.write(json.dumps(entry) + '\n')
 # #endregion
-
-
-def compute_latitude_weights_1d(lat: xr.DataArray) -> xr.DataArray:
-    """
-    Compute latitude weights proportional to cos(lat) (1D over lat).
-    
-    Returns an xr.DataArray with dim ('lat',) normalized so sum == 1.
-    """
-    weights = np.cos(np.deg2rad(lat))
-    weights = weights / weights.sum()
-    return xr.DataArray(weights, coords={'lat': lat}, dims=('lat',))
-
-
-def compute_spatial_weights(
-    lat: xr.DataArray,
-    lon: xr.DataArray,
-    gaussian_center_spec: Optional[dict] = None,
-    sigma_km: float = 1000.0
-) -> xr.DataArray:
-    """
-    Return spatial weights for the grid as an xr.DataArray (lat, lon) normalized so sum == 1.
-
-    If gaussian_center_spec is None, produce lat-only cos(lat) weights expanded to lon.
-    If gaussian_center_spec is provided, combine cos(lat) with gaussian spatial weight
-    computed via great-circle distance (haversine) with given sigma_km.
-
-    gaussian_center_spec expected keys: 'lat' and either 'lon_degwest' or 'lon_deg_east'.
-    Optionally the event config may include 'sigma_km' — this function accepts sigma_km parameter too.
-    """
-    lat1d = lat.values
-    lon1d = lon.values
-
-    if gaussian_center_spec is None:
-        # 1D lat weights expanded to 2D
-        w_lat_1d = compute_latitude_weights_1d(lat)
-        # Expand to 2D by adding lon dimension with the actual lon coordinate
-        w2d = w_lat_1d.expand_dims({'lon': lon})
-        # Ensure normalization sum==1
-        w2d = w2d / w2d.sum()
-        return w2d
-    else:
-        # build a clean center_spec for combine function (remove any sigma key)
-        center_spec = {k: v for k, v in gaussian_center_spec.items() if k in ('lat', 'lon_degwest', 'lon_deg_east')}
-        if 'lat' not in center_spec:
-            raise ValueError("gaussian_center spec must include 'lat' key")
-
-        # combine_lat_gaussian_weights expects 1D arrays for lon & lat
-        combined = combine_lat_gaussian_weights(
-            lat_1d=lat1d,
-            lon_1d=lon1d,
-            center_spec=center_spec,
-            sigma_km=sigma_km
-        )
-        # The returned 'combined' is normalized inside combine_lat_gaussian_weights
-        # but ensure coords align with input lat/lon xarray coords
-        # convert to have same coords/dims as data arrays (if not already)
-        combined = combined.rename({'lat': 'lat', 'lon': 'lon'})
-        return combined
 
 
 def _standardize_coords(ds: xr.Dataset) -> xr.DataArray:
