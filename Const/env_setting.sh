@@ -23,9 +23,14 @@ export GRADS_CMD="grads"
 export ERA5_DIR="/lustre/soge1/data/analysis/era5/0.28125x0.28125"
 export ERA5_DAILY="${ERA5_DIR}/daily"
 export ERA5_INVARIANT="${ERA5_DIR}/invariant"
+export ERA5_LSM_PATH="${ERA5_INVARIANT}/land-sea_mask/nc/era5_invariant_land-sea_mask_20000101.nc"
 
 # GrADS .ctl template directory (for template-based multi-file access)
 export GRADS_CTL_DIR="/lustre/soge1/projects/andante/cenv1201/scripts/data_handling/grads_ctl"
+
+# Pre-sliced T2m data (smaller domain, faster loading) for box plots
+# data_slice: daily MAXIMUM t2m (heat extremes, box plot)
+export DATA_SLICE_DIR="${ROOT_DIR}/Data/data_slice/Tsurf_max_Antarctic-Peninsula"
 
 # Other reanalysis datasets (TODO: Set when available)
 export JRA3Q_DIR="/path/to/JRA-3Q"
@@ -60,15 +65,17 @@ export EVENTS_CONFIG="${ROOT_DIR}/Const/extreme_events.yaml"
 
 # Output directories
 export DATA_DIR="${ROOT_DIR}/Data"
-export INTERMEDIATE_DIR="${ROOT_DIR}/Data/Intermediate"
-export PROCESSED_DIR="${ROOT_DIR}/Data/Processed"
+# F01: Daily MEAN slices (msl, t2m, d2m, sst, u10, v10, tp) for Tsurf/Tsurfdiff fallback & analogue
+export F01_ERA5_SLICES="${DATA_DIR}/F01_preprocess/era5/slices"
+# export INTERMEDIATE_DIR="${ROOT_DIR}/Data/Intermediate"
+# export PROCESSED_DIR="${ROOT_DIR}/Data/Processed"
 export LOG_DIR="${ROOT_DIR}/Log"
 export FIGS_DIR="${ROOT_DIR}/Figs"
 export RESULTS_DIR="${ROOT_DIR}/Results"
 
 # Create output directories if they don't exist
-mkdir -p "${INTERMEDIATE_DIR}"
-mkdir -p "${PROCESSED_DIR}"
+#mkdir -p "${INTERMEDIATE_DIR}" # not being used anymore
+#mkdir -p "${PROCESSED_DIR}" #not being used anymore
 mkdir -p "${LOG_DIR}"
 mkdir -p "${FIGS_DIR}"
 mkdir -p "${RESULTS_DIR}"

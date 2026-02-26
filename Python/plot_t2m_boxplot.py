@@ -98,7 +98,9 @@ def load_land_mask(
         ao = float(getattr(ds["lsm"], "add_offset", 0.0))
         lsm = lsm.astype(np.float64) * sf + ao
     lon = lsm.coords["longitude"]
+    lat_coord = lsm.coords["latitude"]
     lon_0_360 = float(lon.min()) >= 0
+    lat_desc = float(lat_coord[0]) > float(lat_coord[-1])
     # bbox lon is 0–360; convert to LSM convention for selection
     if lon_0_360:
         lon_lo, lon_hi = lon_min, lon_max
@@ -106,12 +108,20 @@ def load_land_mask(
         # LSM uses -180 to 180; convert bbox 0–360 -> -180–180
         lon_lo = lon_min - 360 if lon_min > 180 else lon_min
         lon_hi = lon_max - 360 if lon_max > 180 else lon_max
-    # LSM lat typically -90 to 90 (increasing); use slice(lat_min, lat_max)
+    # LSM lat: use slice(lat_max, lat_min) when descending (90 -> -90)
+    lat_slice = slice(lat_max, lat_min) if lat_desc else slice(lat_min, lat_max)
     lsm_sub = lsm.sel(
-        latitude=slice(lat_min, lat_max),
+        latitude=lat_slice,
         longitude=slice(lon_lo, lon_hi),
     )
-    lsm_aligned = lsm_sub.reindex_like(t2m_template, method="nearest")
+    # reindex_like needs matching lon convention: convert t2m -180-180 -> 0-360
+    # so nearest-neighbor works (xarray does not handle lon wraparound)
+    tpl = t2m_template
+    tpl_lon = tpl.coords["longitude"]
+    if float(tpl_lon.min()) < 0 and lon_0_360:
+        lon_0360 = tpl_lon.where(tpl_lon >= 0, tpl_lon + 360)
+        tpl = tpl.assign_coords(longitude=lon_0360)
+    lsm_aligned = lsm_sub.reindex_like(tpl, method="nearest")
     land = (lsm_aligned.values >= LAND_THRESHOLD).squeeze()
     ds.close()
     return land
