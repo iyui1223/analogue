@@ -34,10 +34,7 @@ from data_utils import (
     ensure_dir,
 )
 
-from analogue_weights import (
-    compute_gaussian_weights,
-    combine_lat_gaussian_weights,
-)
+from spatial_weights import compute_spatial_weights
 
 # #region agent log - Debug logging helper
 DEBUG_LOG = Path.home() / "andante/cenv1201/proj/analogue/.cursor/debug.log"
@@ -55,26 +52,6 @@ def debug_log(hypothesis_id: str, location: str, message: str, data: dict):
     with open(DEBUG_LOG, 'a') as f:
         f.write(json.dumps(entry) + '\n')
 # #endregion
-
-
-def compute_latitude_weights(lat: xr.DataArray) -> xr.DataArray:
-    """
-    Compute latitude weights proportional to cos(lat).
-    
-    Parameters
-    ----------
-    lat : xr.DataArray
-        Latitude coordinate array
-        
-    Returns
-    -------
-    xr.DataArray
-        Latitude weights normalized to sum to 1
-    """
-    weights = np.cos(np.deg2rad(lat))
-    # Normalize so weights sum to 1
-    weights = weights / weights.sum()
-    return weights
 
 
 def _standardize_coords(ds: xr.Dataset) -> xr.DataArray:
@@ -216,43 +193,32 @@ def load_anomaly_data(
 def compute_euclidean_distances(
     data: xr.DataArray,
     reference: xr.DataArray,
-    lat_weights: xr.DataArray
+    spatial_weights: xr.DataArray
 ) -> xr.DataArray:
     """
-    Compute latitude-weighted Euclidean distance between reference and all time steps.
-    
-    Distance formula: no square root as it is computationally heavy and meaningless
-        d(t) = sum_ij( w_j * (data(t,i,j) - ref(i,j))^2 )
-    
-    where w_j = cos(lat_j) / sum(cos(lat))
-    
+    Compute spatial-weighted Euclidean distance between reference and all time steps.
+
+    Distance formula (no square root): d(t) = sum_ij( w_ij * (data(t,i,j) - ref(i,j))^2 )
+    where spatial_weights w_ij are normalized (sum == 1).
+
     Parameters
     ----------
     data : xr.DataArray
         Data array with dimensions (time, lat, lon)
     reference : xr.DataArray
         Reference pattern with dimensions (lat, lon)
-    lat_weights : xr.DataArray
-        Normalized latitude weights with dimension (lat,)
-        
+    spatial_weights : xr.DataArray
+        Normalized spatial weights with dims (lat, lon), sum == 1
+
     Returns
     -------
     xr.DataArray
         Distance for each time step, dimension (time,)
     """
-    # Compute difference (broadcasts reference over time dimension)
     diff = data - reference
-
-    # Square the differences
     diff_sq = diff ** 2
-
-    # Apply latitude weights (broadcasts over lon dimension)
-    weighted_diff_sq = diff_sq * lat_weights
-
-    # Sum over spatial dimensions
-    sum_weighted_sq = weighted_diff_sq.sum(dim=['lat', 'lon'])
-
-    return sum_weighted_sq
+    weighted_diff_sq = diff_sq * spatial_weights
+    return weighted_diff_sq.sum(dim=['lat', 'lon'])
 
 
 def select_time_separated_analogues(
@@ -286,9 +252,6 @@ def select_time_separated_analogues(
     pd.DataFrame
         Selected analogues with rank column
     """
-    # Sort by distance (ascending - smaller is better)
-    # !!! if it takes too long to sort, consider using a more sofisticated sort method
-    # https://leetcode.com/problems/largest-number/solutions/7508028/verrryyy-easssyyy-solution-beats-100-cc-y66we/
 
     df_sorted = df.sort_values(distance_col).reset_index(drop=True)
     
@@ -480,10 +443,22 @@ def find_analogues(
     if verbose:
         print(f"Actual snapshot date used: {actual_snapshot.strftime('%Y-%m-%d')}")
         print(f"Reference pattern shape: {reference.shape}")
-    
-    # Compute latitude weights
-    lat_weights = compute_latitude_weights(data_var.lat)
-    
+
+    # Compute spatial weights (cos(lat) * optional Gaussian via great-circle distance)
+    gaussian_spec = event.get('gaussian_center', None)
+    sigma_km = 1000.0
+    if isinstance(gaussian_spec, dict) and 'sigma_km' in gaussian_spec:
+        try:
+            sigma_km = float(gaussian_spec['sigma_km'])
+        except (TypeError, ValueError):
+            sigma_km = 1000.0
+    spatial_weights = compute_spatial_weights(
+        lat=data_var.lat,
+        lon=data_var.lon,
+        gaussian_center_spec=gaussian_spec,
+        sigma_km=sigma_km
+    )
+
     # Compute distances to all time steps
     if verbose:
         print(f"\nComputing distances to all {len(data_var.time)} time steps...")
@@ -491,7 +466,7 @@ def find_analogues(
         import sys
         sys.stdout.flush()
     
-    distances = compute_euclidean_distances(data_var, reference, lat_weights)
+    distances = compute_euclidean_distances(data_var, reference, spatial_weights)
     
     # Trigger computation (if using dask) with progress bar
     if verbose:

@@ -582,7 +582,8 @@ def process_event(
     analogue_config: Dict[str, Any],
     period: Optional[str] = None,
     skip_existing: bool = True,
-    verbose: bool = True
+    verbose: bool = True,
+    sigma_km_override: Optional[float] = None
 ) -> bool:
     """
     Process analogue search for a single event and save results.
@@ -592,18 +593,31 @@ def process_event(
     # Output directory includes dataset name
     output_dir = ensure_dir(paths['analogue'] / dataset / event_name)
     
-    # Output files - add period suffix if processing single period
+    # Output files - add sigma suffix if overriding (for sensitivity test)
+    if sigma_km_override is not None:
+        sigma_suffix = f"_{int(sigma_km_override)}km"
+    else:
+        sigma_suffix = ""
     suffix = f"_{period}" if period else ""
-    distances_file = output_dir / f'all_distances{suffix}.csv'
-    past_file = output_dir / f'past_analogues{suffix}.csv'
-    present_file = output_dir / f'present_analogues{suffix}.csv'
-    combined_file = output_dir / f'analogues{suffix}.csv'
+    distances_file = output_dir / f'all_distances{sigma_suffix}{suffix}.csv'
+    past_file = output_dir / f'past_analogues{sigma_suffix}{suffix}.csv'
+    present_file = output_dir / f'present_analogues{sigma_suffix}{suffix}.csv'
+    combined_file = output_dir / f'analogues{sigma_suffix}{suffix}.csv'
     
     # Check if can skip
     if skip_existing and combined_file.exists():
         if verbose:
             print(f"[{event_name}] Output exists, skipping: {combined_file}")
         return True
+    
+    # Override sigma_km in event config if provided
+    if sigma_km_override is not None:
+        event = event.copy()
+        if 'gaussian_center' not in event:
+            event['gaussian_center'] = {}
+        else:
+            event['gaussian_center'] = event['gaussian_center'].copy()
+        event['gaussian_center']['sigma_km'] = sigma_km_override
     
     try:
         # Find analogues
@@ -733,6 +747,12 @@ def main():
         action='store_true',
         help='Suppress verbose output'
     )
+    parser.add_argument(
+        '--sigma_km',
+        type=float,
+        default=None,
+        help='Override sigma_km for Gaussian weighting (for sensitivity testing)'
+    )
     args = parser.parse_args()
     
     skip_existing = not args.force
@@ -742,6 +762,8 @@ def main():
     print("Analogue Search Pipeline")
     print("=" * 60)
     print(f"Dataset: {args.dataset}")
+    if args.sigma_km:
+        print(f"Sigma override: {args.sigma_km} km")
     if args.period:
         print(f"Period: {args.period} only")
     
@@ -775,7 +797,8 @@ def main():
                 analogue_config=analogue_config,
                 period=args.period,
                 skip_existing=skip_existing,
-                verbose=verbose
+                verbose=verbose,
+                sigma_km_override=args.sigma_km
             )
         else:
             # Process all events
