@@ -37,7 +37,7 @@ from data_utils import (
 from spatial_weights import compute_spatial_weights
 
 # #region agent log - Debug logging helper
-DEBUG_LOG = Path.home() / "andante/cenv1201/proj/analogue/.cursor/debug.log"
+DEBUG_LOG = Path.home() / ".cursor/debug.log"
 
 def debug_log(hypothesis_id: str, location: str, message: str, data: dict):
     """Append debug log entry to NDJSON file."""
