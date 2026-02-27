@@ -2,7 +2,7 @@
 #SBATCH --job-name=F03_visualization
 #SBATCH --output=/lustre/soge1/projects/andante/cenv1201/proj/analogue/Log/F03_visualization.out
 #SBATCH --error=/lustre/soge1/projects/andante/cenv1201/proj/analogue/Log/F03_visualization.err
-#SBATCH --partition=GPU
+#SBATCH --partition=Short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
@@ -47,14 +47,14 @@ echo "Using GrADS: ${GRADS_CMD}"
 
 # Dataset and event can be overridden via environment variables
 DATASET="${DATASET:-era5}"
-EVENT="${EVENT:-}"
-SKIP_TSURF="${SKIP_TSURF:-1}"
-SKIP_TSURFDIFF="${SKIP_TSURFDIFF:-1}"
+#EVENT="antarctica_peninsula_2022"
+SKIP_TSURF="${SKIP_TSURF:-0}"
+SKIP_TSURFDIFF="${SKIP_TSURFDIFF:-0}"
 SKIP_SPAGHETTI="${SKIP_SPAGHETTI:-0}"
 SKIP_BOXPLOT="${SKIP_BOXPLOT:-0}"
 SKIP_CVM="${SKIP_CVM:-0}"
-SKIP_SCATTER="${SKIP_SCATTER:-1}"
-NTOP="${NTOP:-5}"
+SKIP_SCATTER="${SKIP_SCATTER:-0}"
+NTOP="${NTOP:-15}"
 NMEMBERS="${NMEMBERS:-15}"
 
 echo "============================================================"
