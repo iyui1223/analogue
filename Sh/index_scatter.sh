@@ -2,7 +2,7 @@
 # =============================================================================
 # F03_index_scatter: Climate Index Scatter Plots for Analogue Members
 # =============================================================================
-# Downloads climate index data (Nino3.4, GISTEMP, PDO) if needed, then
+# Downloads climate index data (Nino3.4, GISTEMP, PDO, SAM) if needed, then
 # calls Python/make_index_scatter.py to produce scatter plots showing
 # where each analogue sits in index space.
 #
@@ -95,12 +95,14 @@ NINA34_URL="https://psl.noaa.gov/data/correlation/nina34.anom.data"
 GISTEMP_GLB_URL="https://data.giss.nasa.gov/gistemp/tabledata_v4/GLB.Ts+dSST.txt"
 GISTEMP_SH_URL="https://data.giss.nasa.gov/gistemp/tabledata_v4/T_AIRS/SH.Ts+dSST.txt"
 PDO_URL="https://psl.noaa.gov/pdo/data/pdo.timeseries.sstens.data"
+SAM_URL="https://psl.noaa.gov/data/correlation/sam.20crv2c.short.data"
 
 # Local targets
 NINA34_FILE="${CONST_DIR}/nina34.anom.data"
 GISTEMP_GLB_FILE="${CONST_DIR}/GLB.Ts+dSST.txt"
 GISTEMP_SH_FILE="${CONST_DIR}/SH.Ts+dSST.txt"
 PDO_FILE="${CONST_DIR}/pdo.timeseries.sstens.data"
+SAM_FILE="${CONST_DIR}/sam.20crv2c.short.data"
 
 # Download if missing or older than 1 day
 download_if_needed() {
@@ -120,6 +122,7 @@ download_if_needed "$NINA34_URL" "$NINA34_FILE"
 download_if_needed "$GISTEMP_GLB_URL" "$GISTEMP_GLB_FILE"
 download_if_needed "$GISTEMP_SH_URL" "$GISTEMP_SH_FILE"
 download_if_needed "$PDO_URL" "$PDO_FILE"
+download_if_needed "$SAM_URL" "$SAM_FILE"
 
 # -----------------------------------------------------------------------------
 # Run Python scatter-plot script
@@ -137,6 +140,7 @@ python3 "$PY_SCRIPT" \
     --nina "$NINA34_FILE" \
     --pdo "$PDO_FILE" \
     --glb "$GISTEMP_GLB_FILE" \
+    --sam "$SAM_FILE" \
     --original-date "$SNAPSHOT" \
     --outdir "$OUTPUT_DIR"
 
