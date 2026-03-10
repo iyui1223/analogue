@@ -207,15 +207,17 @@ plot_date() {
     # Alphabetical prefix for file-system sort order:
     # a-7, b-6, c-5, d-4, e-3, f-2, g-1, h0, i1, j2, k3, l4, m5, n6, o7
     offset_str=$(offset_sortable "$offset" "$WINDOW_DAYS")
-    
-    local output="${OUTPUT_DIR}/Tsurf_${period}_${idx_padded}_${offset_str}.png"
+
+    local output_basename="Tsurf_${period}_${idx_padded}_${offset_str}.png"
+    local output="${OUTPUT_DIR}/${output_basename}"
 
     echo "  ${period}_${idx_padded}_${offset_str}: ${target_date} (base ${base_date}, offset ${offset})"
 
-    cd "$GRADS_DIR"
+    # Run GrADS from OUTPUT_DIR with only the basename so printim writes directly
+    # into daily_snapshots/. GASCRP lets plot_Tsurf.gs find colors.gs.
     # Ensure description is safely quoted for grads call (escape single quotes)
     safe_desc="${DESCRIPTION//\'/\'\\\'\'}"
-    $GRADS -blcx "run plot_Tsurf.gs $T2M $MSLP $UWIND $VWIND $TOPO $target_date $LON1 $LON2 $LAT1 $LAT2 $output $period '$safe_desc'" 2>&1 | grep -E "^(Saved|ERROR)" || true
+    (cd "$OUTPUT_DIR" && GASCRP="${GRADS_DIR}" $GRADS -blcx "run ${GRADS_DIR}/plot_Tsurf.gs $T2M $MSLP $UWIND $VWIND $TOPO $target_date $LON1 $LON2 $LAT1 $LAT2 $output_basename $period '$safe_desc'") 2>&1 | grep -E "^(Saved|ERROR)" || true
 
     [ -f "$output" ] && echo "    -> $(basename $output)" || echo "    -> FAILED"
 }
@@ -279,3 +281,4 @@ echo "============================================================"
 echo "F03_visualization (Tsurf snapshots) complete."
 echo "Files: $(ls "$OUTPUT_DIR"/Tsurf_*.png 2>/dev/null | wc -l)"
 echo "============================================================"
+======"
