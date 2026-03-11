@@ -5,7 +5,7 @@ make_index_scatter.py
 Usage:
   python3 make_index_scatter.py --analogues path/to/analogues.csv \
     --nina path/to/nina34.anom.data --pdo path/to/pdo.timeseries.sstens.data \
-    --glb path/to/GLB.Ts+dSST.txt --sam path/to/sam.20crv2c.short.data \
+    --glb path/to/GLB.Ts+dSST.txt --sam path/to/sam_indices_era5.csv \
     --outdir path/to/output_dir [--original-date YYYY-MM-DD]
 
 This script:
@@ -84,6 +84,28 @@ def parse_gistemp_table(path):
 
 def parse_sam_psl(path):
     return parse_year_month_table(path, months_per_line=12)
+
+
+def parse_sam_era5_csv(path):
+    """
+    Parse sam_indices_era5.csv (date,sam_eof,sam_gong).
+    Uses sam_eof column only. Returns dict[(year, month)] = float.
+    """
+    vals = {}
+    with open(path, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            date_str = row.get('date', '').strip()
+            try:
+                dt = datetime.strptime(date_str, "%Y-%m-%d")
+            except ValueError:
+                continue
+            try:
+                v = float(row.get('sam_eof', ''))
+            except (ValueError, TypeError):
+                v = float('nan')
+            vals[(dt.year, dt.month)] = v
+    return vals
 
 # ---------------------
 # Monthly → daily interpolation
@@ -251,7 +273,10 @@ def main():
     nina = parse_nina34_psl(args.nina)
     pdo = parse_pdo_psl(args.pdo)
     glb = parse_gistemp_table(args.glb)
-    sam = parse_sam_psl(args.sam)
+    if args.sam.lower().endswith('.csv'):
+        sam = parse_sam_era5_csv(args.sam)
+    else:
+        sam = parse_sam_psl(args.sam)
 
     groups = defaultdict(list)
 
@@ -298,7 +323,7 @@ def main():
     # Figure 3: SAM vs NINO3.4
     fig3, ax3 = plt.subplots(figsize=(8, 6))
     _scatter_panel(ax3, groups, 'sam', 'nina',
-                   "SAM index",
+                   "SAM index (ERA5 EOF)",
                    "NINO3.4 anomaly",
                    "Figure 3 — SAM vs NINO3.4 (analogues)",
                    color_map, marker_map, size_map)

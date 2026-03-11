@@ -19,6 +19,8 @@ Usage:
 
 import argparse
 import os
+import tempfile
+import zipfile
 from datetime import datetime
 from typing import List, Optional, Tuple
 
@@ -33,7 +35,6 @@ K2C = 273.15
 LAND_THRESHOLD = 0.5
 DEFAULT_LSM_PATH = "/lustre/soge1/data/analysis/era5/0.28125x0.28125/invariant/land-sea_mask/nc/era5_invariant_land-sea_mask_20000101.nc"
 DEFAULT_NMEMBERS = 15
-
 
 def load_event_config(yaml_path: str, event_name: str) -> dict:
     """Return event dict with boxplot_region."""
@@ -76,6 +77,33 @@ def data_slice_file_path(data_dir: str, d: datetime) -> str:
     return os.path.join(data_dir, f"{d.year}{d.month:02d}.nc")
 
 
+def open_t2m_dataset(path: str) -> xr.Dataset:
+    """Open data-slice dataset, handling both plain NetCDF and ZIP archives.
+    Data slices can be YYYYMM.nc (NetCDF) or ZIP containing 2m_temperature*.nc"""
+    with open(path, "rb") as f:
+        magic = f.read(4)
+    if magic == b"PK\x03\x04":
+        with zipfile.ZipFile(path, "r") as z:
+            t2m_name = None
+            for n in z.namelist():
+                if "2m_temperature" in n or "t2m" in n.lower():
+                    t2m_name = n
+                    break
+            if t2m_name is None:
+                raise ValueError(f"No 2m_temperature/t2m file in zip {path}")
+            with tempfile.NamedTemporaryFile(suffix=".nc", delete=False) as tmp:
+                tmp.write(z.read(t2m_name))
+                tmp_path = tmp.name
+        try:
+            ds = xr.open_dataset(tmp_path, engine="netcdf4")
+            os.unlink(tmp_path)
+        except Exception:
+            os.unlink(tmp_path)
+            raise
+        return ds
+    return xr.open_dataset(path, engine="netcdf4")
+
+
 def load_land_mask(
     lsm_path: str,
     lat_min: float,
@@ -85,7 +113,7 @@ def load_land_mask(
     t2m_template: xr.DataArray,
 ) -> np.ndarray:
     """Return 2D boolean (True=land)."""
-    ds = xr.open_dataset(lsm_path)
+    ds = xr.open_dataset(lsm_path, engine="netcdf4")
     lsm = ds["lsm"].isel(time=0)
     if str(lsm.dtype) in ("int16", "int32"):
         sf = float(getattr(ds["lsm"], "scale_factor", 1.0))
@@ -134,7 +162,7 @@ def get_t2m_snapshot_value(
     path = data_slice_file_path(data_dir, snapshot_date)
     if not os.path.isfile(path):
         raise FileNotFoundError(path)
-    ds = xr.open_dataset(path)
+    ds = open_t2m_dataset(path)
     t2m = ds["t2m"]
     lat_slice = slice(lat_max, lat_min) if lat_max > lat_min else slice(lat_min, lat_max)
     data_lon = t2m.coords["longitude"]
@@ -221,7 +249,7 @@ def main():
     if not args.no_land_mask:
         path0 = data_slice_file_path(args.data_dir, past_analogues[0]["date"])
         if os.path.isfile(path0):
-            with xr.open_dataset(path0) as ds0:
+            with open_t2m_dataset(path0) as ds0:
                 t2m0 = ds0["t2m"]
                 lat_slice = slice(lat_max, lat_min) if lat_max > lat_min else slice(lat_min, lat_max)
                 data_lon = t2m0.coords["longitude"]

@@ -95,14 +95,13 @@ NINA34_URL="https://psl.noaa.gov/data/correlation/nina34.anom.data"
 GISTEMP_GLB_URL="https://data.giss.nasa.gov/gistemp/tabledata_v4/GLB.Ts+dSST.txt"
 GISTEMP_SH_URL="https://data.giss.nasa.gov/gistemp/tabledata_v4/T_AIRS/SH.Ts+dSST.txt"
 PDO_URL="https://psl.noaa.gov/pdo/data/pdo.timeseries.sstens.data"
-SAM_URL="https://psl.noaa.gov/data/correlation/sam.20crv2c.short.data"
 
-# Local targets
+# Local targets (SAM from map_room: ERA5-based, full coverage via sam_eof)
 NINA34_FILE="${CONST_DIR}/nina34.anom.data"
 GISTEMP_GLB_FILE="${CONST_DIR}/GLB.Ts+dSST.txt"
 GISTEMP_SH_FILE="${CONST_DIR}/SH.Ts+dSST.txt"
 PDO_FILE="${CONST_DIR}/pdo.timeseries.sstens.data"
-SAM_FILE="${CONST_DIR}/sam.20crv2c.short.data"
+SAM_FILE="${CONST_DIR}/sam_indices_era5.csv"
 
 # Download if missing or older than 1 day
 download_if_needed() {
@@ -122,7 +121,12 @@ download_if_needed "$NINA34_URL" "$NINA34_FILE"
 download_if_needed "$GISTEMP_GLB_URL" "$GISTEMP_GLB_FILE"
 download_if_needed "$GISTEMP_SH_URL" "$GISTEMP_SH_FILE"
 download_if_needed "$PDO_URL" "$PDO_FILE"
-download_if_needed "$SAM_URL" "$SAM_FILE"
+# SAM: use sam_indices_era5.csv (symlink to map_room), not downloaded
+if [ ! -f "$SAM_FILE" ]; then
+    echo "ERROR: SAM file not found: $SAM_FILE"
+    echo "Create symlink: ln -sf /lustre/soge1/projects/andante/cenv1201/proj/map_room/SAM/Const/sam_indices_era5.csv $SAM_FILE"
+    exit 1
+fi
 
 # -----------------------------------------------------------------------------
 # Run Python scatter-plot script
