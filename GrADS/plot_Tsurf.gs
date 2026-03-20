@@ -240,8 +240,8 @@ say 'Layer 6: Map boundaries...'
 * =============================================================================
 say 'Adding titles...'
 
-if (period = 'original')
-  title_prefix = 'ORIGINAL EVENT'
+if (period = 'target')
+  title_prefix = 'TARGET EVENT'
 endif
 if (period = 'past')
   title_prefix = 'PAST ANALOGUE'

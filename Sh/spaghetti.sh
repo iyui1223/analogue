@@ -3,12 +3,12 @@
 # spaghetti: Z500 Spaghetti Plots for Analogue Members
 # =============================================================================
 # Generates spaghetti-style Z500 synoptic visualizations using GrADS.
-# Overlays contours from the original event (snapshot date) + top 5 past and
+# Overlays contours from the target event (snapshot date) + top 5 past and
 # top 5 present analogues, all at day 0 (snapshot date). Full Antarctic
 # domain (south of 50°S) for sps projection.
 #
 # Colour scheme:
-#   Original event   : black
+#   Target event     : black
 #   Past analogues   : dark blue
 #   Present analogues: dark red
 #
@@ -198,7 +198,7 @@ generate_spaghetti_gs() {
     local expr="z/9.80665"   # geopotential (m²/s²) → geopotential height (gpm)
     local panel_title="Z500 (gpm) spaghetti"
 
-    # Colour indices: 20=original, 30=past, 40=present (single shade per category)
+    # Colour indices: 20=target, 30=past, 40=present (single shade per category)
     local orig_color=20   # black
     local past_color=30   # dark blue
     local pres_color=40   # dark red
@@ -218,7 +218,7 @@ generate_spaghetti_gs() {
 GSHEADER
 
     # Define custom RGB colours (one per category)
-    echo "'set rgb 20 0 0 0'" >> "$gs_file"       # original: black
+    echo "'set rgb 20 0 0 0'" >> "$gs_file"       # target: black
     echo "'set rgb 30 0 0 180'" >> "$gs_file"     # past: dark blue
     echo "'set rgb 40 180 0 0'" >> "$gs_file"     # present: dark red
 
@@ -276,8 +276,8 @@ GSPAREA
 GSDRAW
     }
 
-    # --- Draw original event (snapshot date only) ---
-    echo "* ===== Original event =====" >> "$gs_file"
+    # --- Draw target event (snapshot date only) ---
+    echo "* ===== Target event =====" >> "$gs_file"
     local target
     target=$(date_shift "$SNAPSHOT" 0) || true
     if [ -n "$target" ]; then
@@ -288,7 +288,7 @@ GSDRAW
             gtime=$(grads_time_str "$target")
             emit_draw_block "$fpath" "$gtime" "$orig_color" "$orig_thick" "$line_style" "$expr" "$level"
         else
-            echo "  [WARN] Original: $fpath not found"
+            echo "  [WARN] Target: $fpath not found"
         fi
     fi
 
@@ -337,7 +337,7 @@ GSDRAW
 * Legend (colour key)
 'set strsiz 0.10'
 'set string 1 l 4'
-'draw string 0.5 1.35 Black: original  |  Blue: past top-${N_TOP}  |  Red: present top-${N_TOP}  |  Snapshot date only'
+'draw string 0.5 1.35 Black: target  |  Blue: past top-${N_TOP}  |  Red: present top-${N_TOP}  |  Snapshot date only'
 
 * Save PNG
 'printim ${outpng} white x1400 y1000'

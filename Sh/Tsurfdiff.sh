@@ -1,11 +1,11 @@
 #!/bin/bash
 # =============================================================================
-# F03_Tsurfdiff: Temperature Difference Maps (analogue minus original)
+# F03_Tsurfdiff: Temperature Difference Maps (analogue minus target)
 # =============================================================================
 # Generates differential synoptic visualizations using GrADS.
 # For each analogue (past/present) at each time offset, plots:
-#   - Shaded fill: T2m difference (analogue - original) in deg C
-#   - Black dashed contours: original MSLP
+#   - Shaded fill: T2m difference (analogue - target) in deg C
+#   - Black dashed contours: target MSLP
 #   - Blue (past) / Red (present) solid contours: analogue MSLP
 #
 # Usage:

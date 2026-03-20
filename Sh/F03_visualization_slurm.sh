@@ -14,7 +14,7 @@
 # =============================================================================
 # Runs all F03 sub-scripts in sequence:
 #   1. snapshots.sh        — Tsurf snapshot maps (GrADS)
-#   2. Tsurfdiff.sh        — Tsurf difference maps: analogue minus original (GrADS)
+#   2. Tsurfdiff.sh        — Tsurf difference maps: analogue minus target (GrADS)
 #   3. spaghetti.sh        — Z500 spaghetti plots (GrADS)
 #   4. t2m_boxplot.sh      — T2m box-and-whisker by lead time (Python)
 #   5. cvm_test.sh         — Cramér–von Mises test (past vs present, Python)
@@ -51,7 +51,7 @@ DATASET="${DATASET:-era5}"
 DO_TSURF="${DO_TSURF:-0}"
 DO_TSURFDIFF="${DO_TSURFDIFF:-0}"
 DO_SPAGHETTI="${DO_SPAGHETTI:-0}"
-DO_BOXPLOT="${DO_BOXPLOT:-0}"
+DO_BOXPLOT="${DO_BOXPLOT:-1}"
 DO_CVM="${DO_CVM:-1}"
 DO_SCATTER="${DO_SCATTER:-0}"
 NTOP="${NTOP:-30}"
@@ -95,7 +95,7 @@ else
 fi
 
 # -------------------------------------------------------
-# 2. Tsurf difference maps (analogue minus original)
+# 2. Tsurf difference maps (analogue minus target)
 # -------------------------------------------------------
 if [ "$DO_TSURFDIFF" = "1" ]; then
     echo ""

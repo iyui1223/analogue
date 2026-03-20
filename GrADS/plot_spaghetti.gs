@@ -12,15 +12,15 @@
 *
 * Single-panel Z500 spaghetti map:
 *   - Full Antarctic domain (lat -90 to -50, lon 0-360) when projection is sps
-*   - Original event + top 5 past + top 5 present analogues
+*   - Target event + top 5 past + top 5 present analogues
 *   - Snapshot date only (day 0)
 *
 * Colour scheme (custom RGB indices 20, 30, 40):
-*   Original event:  black (0,0,0)
+*   Target event:    black (0,0,0)
 *   Past analogues:  dark blue (0,0,180)
 *   Present analogues: dark red (180,0,0)
 *
-* Line thickness: Original 6, analogues 4
+* Line thickness: Target 6, analogues 4
 *
 * Data conventions:
 *   - ERA5 monthly files: era5_daily_{varname}_{YYYY}_{MM}.nc

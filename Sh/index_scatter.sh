@@ -145,7 +145,7 @@ python3 "$PY_SCRIPT" \
     --pdo "$PDO_FILE" \
     --glb "$GISTEMP_GLB_FILE" \
     --sam "$SAM_FILE" \
-    --original-date "$SNAPSHOT" \
+    --target-date "$SNAPSHOT" \
     --outdir "$OUTPUT_DIR"
 
 echo ""

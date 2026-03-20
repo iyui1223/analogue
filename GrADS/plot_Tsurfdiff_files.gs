@@ -1,6 +1,6 @@
 *
 * plot_Tsurfdiff_files.gs
-* Temperature difference (analogue minus original) using explicit NetCDF paths
+* Temperature difference (analogue minus target) using explicit NetCDF paths
 *
 * Same plot as plot_Tsurfdiff.gs but opens 4 files directly instead of ctl templates.
 * Used when ERA5 main archive is missing (e.g. post-2022) and data_slice is used.
@@ -40,7 +40,7 @@ say 'Orig T2m: ' % orig_t2m
 say 'Orig MSL: ' % orig_msl
 say 'Anal T2m: ' % anal_t2m
 say 'Anal MSL: ' % anal_msl
-say 'Original: ' % orig_date
+say 'Target:   ' % orig_date
 say 'Analogue: ' % anal_date
 say 'Output:   ' % output_file
 say '============================================================'
@@ -115,7 +115,7 @@ if (is_antarctic = 1)
   'set mproj sps'
 endif
 
-* Define original fields
+* Define target fields
 'set dfile ' % orig_t2m_fnum
 'set time ' % orig_time
 'define origt2m = t2m.' % orig_t2m_fnum % ' - 273.15'
@@ -137,7 +137,7 @@ endif
 'set ccols 40 42 44 46 48 50 52 54 56 58 60'
 'd t2m.' % anal_t2m_fnum % ' - 273.15 - origt2m'
 
-* Layer 2: Original MSLP (if available)
+* Layer 2: Target MSLP (if available)
 if (has_orig_msl = 1)
   'set gxout contour'
   'set cint 4'
@@ -188,10 +188,10 @@ endif
 'set strsiz 0.18'
 'draw string 5.5 8.3 ' % title_prefix % ' diff: ' % title
 'set strsiz 0.13'
-'draw string 5.5 7.95 Original: ' % orig_date % '    Analogue: ' % anal_date
+'draw string 5.5 7.95 Target: ' % orig_date % '    Analogue: ' % anal_date
 'set strsiz 0.10'
 'set string 1 c 4'
-'draw string 5.5 1.55 Shading: T2m difference (C) | Black dashed: original MSLP (4hPa) | ' % contour_lbl
+'draw string 5.5 1.55 Shading: T2m difference (C) | Black dashed: target MSLP (4hPa) | ' % contour_lbl
 
 say 'Saving to: ' % output_file
 'printim ' % output_file % ' white x1400 y1000'

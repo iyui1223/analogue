@@ -269,8 +269,7 @@ def main():
         "--ntop",
         type=int,
         default=DEFAULT_NTOP,
-        help=f"Number of top analogues per period (default: {DEFAULT_NTOP}). "
-        f"Present panel uses (ntop-1) analogues + target.",
+        help=        f"Number of top analogues per period (default: {DEFAULT_NTOP}).",
     )
     parser.add_argument(
         "--lead-days",
@@ -355,8 +354,7 @@ def main():
             print("Skip past", snap.date(), e)
 
     present_series = []
-    n_present_analogues = max(0, args.ntop - 1)
-    for a in present_analogues[:n_present_analogues]:
+    for a in present_analogues[:args.ntop]:
         snap = a["date"]
         start = snap - timedelta(days=7)
         try:
@@ -368,7 +366,6 @@ def main():
             present_series.append(s)
         except FileNotFoundError as e:
             print("Skip present", snap.date(), e)
-    present_series.append(target_series)
 
     past_arr = np.array(past_series) if past_series else np.zeros((0, lead_days))
     present_arr = np.array(present_series) if present_series else np.zeros((0, lead_days))
@@ -464,7 +461,7 @@ def main():
     lon_hi_disp = 360 - lon_max if lon_max > 180 else abs(lon_max)
     ax.set_title(
         f"T2m {region_label}mean ({abs(lat_min):.0f}–{abs(lat_max):.0f}°S, {lon_lo_disp:.0f}–{lon_hi_disp:.0f}°W) — "
-        f"top {args.ntop} past; top {n_present_analogues} present + target"
+        f"top {args.ntop} past; top {args.ntop} present"
     )
     ax.legend(loc="best", fontsize=8)
     # Vertical grid at target event dates; horizontal at 0 and every 2 degrees (°C)

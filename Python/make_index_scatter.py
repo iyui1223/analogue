@@ -6,7 +6,7 @@ Usage:
   python3 make_index_scatter.py --analogues path/to/analogues.csv \
     --nina path/to/nina34.anom.data --pdo path/to/pdo.timeseries.sstens.data \
     --glb path/to/GLB.Ts+dSST.txt --sam path/to/sam_indices_era5.csv \
-    --outdir path/to/output_dir [--original-date YYYY-MM-DD]
+    --outdir path/to/output_dir [--target-date YYYY-MM-DD]
 
 This script:
  - reads analogues.csv (CSV with rows like: date,timer,year,month,day,rank,period)
@@ -14,7 +14,7 @@ This script:
  - linearly interpolates monthly values to daily resolution using the 15th of
    each month as the anchor point, so that analogue snapshots (which are daily)
    get a smoothly interpolated index value rather than a step-function
- - for each analogue (past/present/original) extracts the interpolated index values
+ - for each analogue (past/present/target) extracts the interpolated index values
  - makes three scatter figures:
      Figure1: NINO3.4 (x) vs PDO (y)
      Figure2: GLB.Ts  (x) vs NINO3.4 (y)
@@ -201,30 +201,30 @@ def read_analogues(path):
 def ensure_dir(d):
     os.makedirs(d, exist_ok=True)
 
-def add_original_to_analogues(analogues, original_date_str):
+def add_target_to_analogues(analogues, target_date_str):
     """
-    If original_date_str is provided and there is no row with period 'original',
-    add a single row derived from original_date_str.
+    If target_date_str is provided and there is no row with period 'target',
+    add a single row derived from target_date_str.
     """
-    if not original_date_str:
+    if not target_date_str:
         return analogues
     for r in analogues:
-        if r.get('period') == 'original':
+        if r.get('period') == 'target':
             return analogues
     try:
-        dt = datetime.fromisoformat(original_date_str)
+        dt = datetime.fromisoformat(target_date_str)
     except Exception:
         try:
-            dt = datetime.strptime(original_date_str, "%Y-%m-%d")
+            dt = datetime.strptime(target_date_str, "%Y-%m-%d")
         except Exception:
             return analogues
-    new_row = {'date': dt.strftime("%Y-%m-%d"), 'year': dt.year, 'month': dt.month, 'day': dt.day, 'period': 'original'}
+    new_row = {'date': dt.strftime("%Y-%m-%d"), 'year': dt.year, 'month': dt.month, 'day': dt.day, 'period': 'target'}
     return [new_row] + analogues
 
 
 def _scatter_panel(ax, groups, xkey, ykey, xlabel, ylabel, title, color_map, marker_map, size_map):
     """Draw a single scatter panel for two index keys."""
-    for period in ['past', 'present', 'original']:
+    for period in ['past', 'present', 'target']:
         items = groups.get(period, [])
         xs, ys = [], []
         for it in items:
@@ -234,8 +234,8 @@ def _scatter_panel(ax, groups, xkey, ykey, xlabel, ylabel, title, color_map, mar
             xs.append(x)
             ys.append(y)
         if xs:
-            edgecol = 'k' if period == 'original' else None
-            zord = 5 if period == 'original' else 3
+            edgecol = 'k' if period == 'target' else None
+            zord = 5 if period == 'target' else 3
             ax.scatter(xs, ys, label=period, c=color_map.get(period, 'gray'),
                        marker=marker_map.get(period, 'o'), s=size_map.get(period, 40),
                        edgecolors=edgecol, alpha=0.95, zorder=zord)
@@ -257,14 +257,14 @@ def main():
     p.add_argument("--glb", required=True)
     p.add_argument("--sam", required=True)
     p.add_argument("--outdir", required=True)
-    p.add_argument("--original-date", default=None,
-                   help="YYYY-MM-DD snapshot/original date to highlight")
+    p.add_argument("--target-date", default=None,
+                   help="YYYY-MM-DD snapshot/target date to highlight")
     args = p.parse_args()
 
     analogues = read_analogues(args.analogues)
     if analogues is None:
         analogues = []
-    analogues = add_original_to_analogues(analogues, args.original_date)
+    analogues = add_target_to_analogues(analogues, args.target_date)
 
     if len(analogues) == 0:
         print("No analogues found in", args.analogues)
@@ -294,9 +294,9 @@ def main():
 
     ensure_dir(args.outdir)
 
-    color_map = {'past': 'tab:blue', 'present': 'tab:orange', 'original': 'tab:red'}
-    marker_map = {'past': 'o', 'present': 's', 'original': '*'}
-    size_map = {'past': 40, 'present': 50, 'original': 200}
+    color_map = {'past': 'tab:blue', 'present': 'tab:orange', 'target': 'tab:red'}
+    marker_map = {'past': 'o', 'present': 's', 'target': '*'}
+    size_map = {'past': 40, 'present': 50, 'target': 200}
 
     # Figure 1: NINO3.4 vs PDO
     fig1, ax1 = plt.subplots(figsize=(8, 6))
@@ -334,7 +334,7 @@ def main():
     csv_out = os.path.join(args.outdir, "index_values_extracted.csv")
     with open(csv_out, 'w', encoding='utf-8') as cf:
         cf.write("date,year,month,day,period,nina34,pdo,glb,sam\n")
-        for period in ['original', 'present', 'past']:
+        for period in ['target', 'present', 'past']:
             for it in groups.get(period, []):
                 def _fmt(v):
                     return "" if math.isnan(v) else f"{v:.4f}"

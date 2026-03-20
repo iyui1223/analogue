@@ -1,10 +1,10 @@
 *
 * plot_Tsurfdiff.gs
-* Temperature difference (analogue minus original) with dual MSLP contours
+* Temperature difference (analogue minus target) with dual MSLP contours
 *
 * Creates a layered plot with:
-*   - Shaded fill : T2m difference (analogue - original) in deg C, BWR colormap
-*   - Black dashed contours : original event MSLP (hPa, 4 hPa interval)
+*   - Shaded fill : T2m difference (analogue - target) in deg C, BWR colormap
+*   - Black dashed contours : target event MSLP (hPa, 4 hPa interval)
 *   - Blue/Red solid contours : analogue MSLP (blue=past, red=present)
 *   - Coastlines and map boundaries
 *
@@ -16,7 +16,7 @@
 *
 * Arguments:
 *   CTL_DIR     - Path to directory containing .ctl files
-*   ORIG_DATE   - Original event date at this offset (YYYY-MM-DD)
+*   ORIG_DATE   - Target event date at this offset (YYYY-MM-DD)
 *   ANAL_DATE   - Analogue date at this offset (YYYY-MM-DD)
 *   PERIOD      - "past" or "present"
 *   LON1, LON2  - Longitude range (0-360)
@@ -48,7 +48,7 @@ say '============================================================'
 say 'Tsurfdiff Plot Generation'
 say '============================================================'
 say 'CTL dir:  ' % ctl_dir
-say 'Original: ' % orig_date
+say 'Target:   ' % orig_date
 say 'Analogue: ' % anal_date
 say 'Period:   ' % period
 say 'Region:   lon[' % lon1 % ',' % lon2 % '] lat[' % lat1 % ',' % lat2 % ']'
@@ -104,7 +104,7 @@ anal_mon  = subwrd(mon_names, math_int(anal_month))
 orig_time = orig_day % orig_mon % orig_year
 anal_time = anal_day % anal_mon % anal_year
 
-say 'Original GrADS time: ' % orig_time
+say 'Target GrADS time: ' % orig_time
 say 'Analogue GrADS time: ' % anal_time
 
 * =============================================================================
@@ -124,9 +124,9 @@ if (is_antarctic = 1)
 endif
 
 * =============================================================================
-* Capture original fields using 'define'
+* Capture target fields using 'define'
 * =============================================================================
-say 'Defining original fields at ' % orig_time % ' ...'
+say 'Defining target fields at ' % orig_time % ' ...'
 
 'set dfile 1'
 'set time ' % orig_time
@@ -136,7 +136,7 @@ say 'Defining original fields at ' % orig_time % ' ...'
 'set time ' % orig_time
 'define origmsl = msl.2 / 100'
 
-say 'Original fields defined.'
+say 'Target fields defined.'
 
 * =============================================================================
 * Switch to analogue date for plotting
@@ -147,7 +147,7 @@ say 'Original fields defined.'
 'set lon ' % lon1 % ' ' % lon2
 
 * =============================================================================
-* Layer 1: Shaded T2m difference (analogue - original) in deg C
+* Layer 1: Shaded T2m difference (analogue - target) in deg C
 * Uses BWR diverging colormap (indices 40-60 from colors.gs)
 * =============================================================================
 say 'Layer 1: Temperature difference shading...'
@@ -158,9 +158,9 @@ say 'Layer 1: Temperature difference shading...'
 'd t2m.1 - 273.15 - origt2m'
 
 * =============================================================================
-* Layer 2: Original MSLP contours (black, dashed)
+* Layer 2: Target MSLP contours (black, dashed)
 * =============================================================================
-say 'Layer 2: Original MSLP contours (black dashed)...'
+say 'Layer 2: Target MSLP contours (black dashed)...'
 
 'set gxout contour'
 'set cint 4'
@@ -228,11 +228,11 @@ endif
 'draw string 5.5 8.3 ' % title_prefix % ' diff: ' % title
 
 'set strsiz 0.13'
-'draw string 5.5 7.95 Original: ' % orig_date % '    Analogue: ' % anal_date
+'draw string 5.5 7.95 Target: ' % orig_date % '    Analogue: ' % anal_date
 
 'set strsiz 0.10'
 'set string 1 c 4'
-'draw string 5.5 1.55 Shading: T2m difference (C) | Black dashed: original MSLP (4hPa) | ' % contour_lbl
+'draw string 5.5 1.55 Shading: T2m difference (C) | Black dashed: target MSLP (4hPa) | ' % contour_lbl
 
 * =============================================================================
 * Save output

@@ -13,8 +13,8 @@
 #
 # Output: Figs/F03_visualization/{event}/{dataset}/daily_snapshots/Tsurf_*.png
 # where:
-#   period = past | present | original
-#   index  = integer index of analogue in the list (starting at 1). original uses 0
+#   period = past | present | target
+#   index  = integer index of analogue in the list (starting at 1). target uses 0
 #   offset = signed integer indicating days difference from analogue date (-7 .. 0 .. 7)
 # =============================================================================
 
@@ -164,8 +164,8 @@ PYCODE
 # -----------------------------------------------------------------------------
 plot_date() {
     local base_date="$1"   # e.g. 2020-02-08 (the analogue date around which offsets are taken)
-    local period="$2"      # past | present | original
-    local idx="$3"         # integer index for analogue (1..N), '0' for original
+    local period="$2"      # past | present | target
+    local idx="$3"         # integer index for analogue (1..N), '0' for target
     local offset="$4"      # signed integer, -7..0..7
 
     # compute target date
@@ -226,20 +226,20 @@ plot_date() {
 # Generate plots
 # -----------------------------------------------------------------------------
 echo ""
-echo "Plotting original event (index 000)..."
-# original uses index 0
+echo "Plotting target event (index 000)..."
+# target uses index 0
 for off in $(seq -$WINDOW_DAYS $WINDOW_DAYS); do
-    plot_date "$SNAPSHOT" "original" 0 "$off"
+    plot_date "$SNAPSHOT" "target" 0 "$off"
 done
 
-# link original_000 images to 001, 002, ..., 015 for the analogue comparison
+# link target_000 images to 001, 002, ..., 015 for the analogue comparison
 (
  cd ${OUTPUT_DIR}
- for src in Tsurf_original_000_*.png; do
+ for src in Tsurf_target_000_*.png; do
    [ -e "$src" ] || continue
-   suffix=${src#Tsurf_original_000_}
+   suffix=${src#Tsurf_target_000_}
    for i in $(seq -f "%03g" 1 15); do
-     tgt="Tsurf_original_${i}_${suffix}"
+     tgt="Tsurf_target_${i}_${suffix}"
      if [ -e "$tgt" ]; then
        [ -L "$tgt" ] && [ "$(readlink "$tgt")" = "$src" ] && continue
        echo "Skipping existing: $tgt"
