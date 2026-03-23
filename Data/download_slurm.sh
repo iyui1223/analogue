@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH -J era5-peninsula-2022
 #SBATCH -o era5-peninsula-2022_%j.out
-#SBATCH --time=12:00:00
-#SBATCH --partition=Long
+#SBATCH --time=48:00:00
+#SBATCH --partition=Interactive
 
 # === Antarctic Peninsula: DJFM (Dec, Jan, Feb, Mar) for 2022 event + analogues ===
 # Shares era5_daily_peninsula with 2020; adds months 12,1,2,3 for analogue dates
-OUTPUT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue/Data/data_slice/Tsurf_max_Antarctic-Peninsula"
+OUTPUT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue/Data/F01_preprocess/era5/t2m_daily_max"
 
 source /lustre/soge1/projects/andante/cenv1201/venvs/template/bin/activate
 

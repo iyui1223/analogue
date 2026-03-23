@@ -19,21 +19,18 @@ export GRADS_CMD="grads"
 # -----------------------------------------------------------------------------
 # Data Source Directories (use lustre paths for SLURM compatibility)
 # -----------------------------------------------------------------------------
-# ERA5 data on SOGE shared storage
-export ERA5_DIR="/lustre/soge1/data/analysis/era5/0.28125x0.28125"
-export ERA5_DAILY="${ERA5_DIR}/daily"
-export ERA5_INVARIANT="${ERA5_DIR}/invariant"
-export ERA5_LSM_PATH="${ERA5_INVARIANT}/land-sea_mask/nc/era5_invariant_land-sea_mask_20000101.nc"
+# User-managed ERA5 data store (global monthly files, CDS downloads)
+export ERA5_HEAVY_DIR="/lustre/soge1/projects/andante/cenv1201/heavy/ERA5/daily/Surf/slices"
+
+# ERA5 invariant fields (project-local copy)
+export F01_ERA5_INVARIANT="${ROOT_DIR}/Data/F01_preprocess/era5/invariant"
+export ERA5_LSM_PATH="${F01_ERA5_INVARIANT}/land_sea_mask.nc"
 
 # GrADS .ctl template directory (for template-based multi-file access)
 export GRADS_CTL_DIR="/lustre/soge1/projects/andante/cenv1201/scripts/data_handling/grads_ctl"
 
-# Pre-sliced T2m data (smaller domain, faster loading) for box plots
-# data_slice: daily MAXIMUM t2m (heat extremes, box plot)
-export DATA_SLICE_DIR="${ROOT_DIR}/Data/data_slice/Tsurf_max_Antarctic-Peninsula"
-
-# Other reanalysis datasets (TODO: Set when available)
-export JRA3Q_DIR="/path/to/JRA-3Q"
+# JRA-3Q reanalysis (6-hourly GRIB2 surface analysis, 1.25° grid)
+export JRA3Q_DIR="/lustre/soge1/data/analysis/jra-q3/anl_surf125"
 export MSWX_DIR="/lustre/soge1/data/analysis/gloh2o-mswx"
 
 # -----------------------------------------------------------------------------
@@ -65,8 +62,10 @@ export EVENTS_CONFIG="${ROOT_DIR}/Const/extreme_events.yaml"
 
 # Output directories
 export DATA_DIR="${ROOT_DIR}/Data"
-# F01: Daily MEAN slices (msl, t2m, d2m, sst, u10, v10, tp) for Tsurf/Tsurfdiff fallback & analogue
-export F01_ERA5_SLICES="${DATA_DIR}/F01_preprocess/era5/slices"
+# F01: Domain-sliced daily MEAN (msl, t2m, u10, v10, tp) for visualization & analogue
+export F01_ERA5_DAILY_MEAN="${DATA_DIR}/F01_preprocess/era5/daily_mean"
+# ERA5 daily MAXIMUM t2m (domain-sliced, for box plots / CvM test)
+export DATA_SLICE_DIR="${DATA_DIR}/F01_preprocess/era5/t2m_daily_max"
 # export INTERMEDIATE_DIR="${ROOT_DIR}/Data/Intermediate"
 # export PROCESSED_DIR="${ROOT_DIR}/Data/Processed"
 export LOG_DIR="${ROOT_DIR}/Log"

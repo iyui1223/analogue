@@ -20,6 +20,7 @@ Reads:
 import argparse
 import os
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -34,7 +35,11 @@ DEFAULT_LEAD_DAYS = 15
 LAND_THRESHOLD = 0.5
 PAST_RANGE = (1948, 1987)
 PRESENT_RANGE = (1988, 2026)
-DEFAULT_LSM_PATH = "/lustre/soge1/data/analysis/era5/0.28125x0.28125/invariant/land-sea_mask/nc/era5_invariant_land-sea_mask_20000101.nc"
+DEFAULT_LSM_PATH = os.environ.get(
+    "ERA5_LSM_PATH",
+    str(Path(__file__).resolve().parent.parent
+        / "Data" / "F01_preprocess" / "era5" / "invariant" / "land_sea_mask.nc"),
+)
 
 
 def load_event_config(yaml_path: str, event_name: str) -> dict:

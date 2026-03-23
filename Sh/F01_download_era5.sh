@@ -1,5 +1,9 @@
 #!/bin/bash
 # =============================================================================
+# DEPRECATED: Use Sh/F01_preprocess_era5.sh instead.
+# This script downloaded global ERA5 data from CDS.  The new pipeline
+# sources from heavy/ and domain-slices locally.
+# =============================================================================
 # F01: ERA5 Daily-Mean Slice Download (local/interactive)
 # =============================================================================
 # Calls Python/download_era5_slices.py. For batch, use F01_download_era5_slurm.sh.

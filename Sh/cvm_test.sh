@@ -12,7 +12,7 @@
 # Reads:
 #   - Const/extreme_events.yaml (boxplot_region)
 #   - Data/F02_analogue_search/{dataset}/{event}/analogues.csv
-#   - Data/data_slice/YYYYMM.nc (daily max T2m)
+#   - Data/F01_preprocess/era5/t2m_daily_max/YYYYMM.nc (daily max T2m)
 #
 # Output:
 #   Figs/F03_visualization/{event}/{dataset}/cvm_test_results.txt
@@ -35,7 +35,7 @@ DATASET="${DATASET:-era5}"
 EVENT="${EVENT:-}"
 NMEMBERS="${NMEMBERS:-15}"
 
-DATA_SLICE_DIR="${DATA_SLICE_DIR:-${ROOT_DIR}/Data/data_slice/Tsurf_max_Antarctic-Peninsula}"
+DATA_SLICE_DIR="${DATA_SLICE_DIR:-${DATA_DIR}/F01_preprocess/era5/t2m_daily_max}"
 EVENTS_FILE="${ROOT_DIR}/Const/extreme_events.yaml"
 
 # -----------------------------------------------------------------------------

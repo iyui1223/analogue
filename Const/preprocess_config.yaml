@@ -34,22 +34,20 @@ reanalysis:
           file_pattern: "t2m_{date}.nc"
           nc_varname: "t2m"
   
-  # JRA-3Q configuration (for robustness testing - future use)
+  # JRA-3Q configuration (reanalysis comparison, SLP only)
+  # Source: /lustre/soge1/data/analysis/jra-q3/anl_surf125/
+  # Format: GRIB2, 6-hourly, 1.25° grid (288x145)
+  # File naming: anl_surf125.YYYYMMDDHH (HH = 00, 06, 12, 18)
+  # Coverage: 1947-09 to ~1993-09 (download interrupted)
+  # Preprocessing: Python/preprocess_jra3q.py -> daily mean SLP, domain-sliced
   jra3q:
-    enabled: false
+    enabled: true
+    source_format: "grib2"
     variables:
       circulation:
-        - name: z500
-          file_pattern: "anl_p125.007_hgt.{date}.nc"
-          nc_varname: "HGT_GDS0_ISBL"
-          level: 500
         - name: msl
-          file_pattern: "anl_surf125.002_prmsl.{date}.nc"
-          nc_varname: "PRMSL_GDS0_MSL"
-      temperature:
-        - name: t2m
-          file_pattern: "anl_surf125.011_tmp.{date}.nc"
-          nc_varname: "TMP_GDS0_HTGL"
+          grib_shortname: "prmsl"
+          nc_varname: "prmsl"
   
   # MSWX configuration (retained for future use)
   mswx:

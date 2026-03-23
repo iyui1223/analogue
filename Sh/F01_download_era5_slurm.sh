@@ -1,4 +1,7 @@
 #!/bin/bash
+# DEPRECATED: Use Sh/F01_preprocess_era5_slurm.sh instead.
+# This script downloaded global ERA5 from CDS. The new pipeline
+# sources from heavy/ and domain-slices locally.
 #SBATCH --job-name=F01_download_era5
 #SBATCH --output=/lustre/soge1/projects/andante/cenv1201/proj/analogue/Log/F01_download_era5_%j.out
 #SBATCH --error=/lustre/soge1/projects/andante/cenv1201/proj/analogue/Log/F01_download_era5_%j.err

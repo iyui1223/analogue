@@ -20,8 +20,10 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 
-LSM_PATH = "/lustre/soge1/data/analysis/era5/0.28125x0.28125/invariant/land-sea_mask/nc/era5_invariant_land-sea_mask_20000101.nc"
-DATA_SLICE_DIR = "Data/data_slice/Tsurf_max_Antarctic-Peninsula"
+LSM_PATH = os.environ.get("ERA5_LSM_PATH",
+           "Data/F01_preprocess/era5/invariant/land_sea_mask.nc")
+DATA_SLICE_DIR = os.environ.get("DATA_SLICE_DIR",
+                "Data/F01_preprocess/era5/t2m_daily_max")
 # boxplot_region: antarctica_peninsula (0–360 lon)
 LAT_MIN, LAT_MAX = -70.0, -60.0
 LON_MIN_0360, LON_MAX_0360 = 280.0, 310.0  # 80W–50W

@@ -3,7 +3,7 @@
 # t2m_boxplot: T2m Box-and-Whisker by Lead Time for Analogue Members
 # =============================================================================
 # Generates T2m box plots showing past/present analogue spread vs target event.
-# Uses pre-sliced data (Data/data_slice) for fast loading.
+# Uses pre-sliced data (Data/F01_preprocess/era5/t2m_daily_max) for fast loading.
 #
 # Usage:
 #   ./t2m_boxplot.sh --dataset era5 --event antarctica_peninsula_2020
@@ -12,7 +12,7 @@
 # Reads:
 #   - Const/extreme_events.yaml (event definitions)
 #   - Data/F02_analogue_search/{dataset}/{event}/analogues.csv
-#   - Data/data_slice/YYYYMM.nc (monthly T2m, absolute path)
+#   - Data/F01_preprocess/era5/t2m_daily_max/YYYYMM.nc (monthly T2m daily max)
 #
 # Output:
 #   Figs/F03_visualization/{event}/{dataset}/t2m_boxplot_top{N}.png
@@ -37,7 +37,7 @@ EVENT="${EVENT:-}"
 NTOP="${NTOP:-5}"
 
 # Absolute paths (no symlinks)
-DATA_SLICE_DIR="${DATA_SLICE_DIR:-${ROOT_DIR}/Data/data_slice/Tsurf_max_Antarctic-Peninsula}"
+DATA_SLICE_DIR="${DATA_SLICE_DIR:-${DATA_DIR}/F01_preprocess/era5/t2m_daily_max}"
 EVENTS_FILE="${ROOT_DIR}/Const/extreme_events.yaml"
 
 # -----------------------------------------------------------------------------

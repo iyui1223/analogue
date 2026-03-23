@@ -34,10 +34,9 @@ PYTHON_DIR="${ROOT_DIR}/Python"
 
 
 FIGS_BASE="${ROOT_DIR}/Figs/F03_visualization"
-ERA5_DAILY="${ERA5_DIR}/daily"
-ERA5_INVARIANT="${ERA5_DIR}/invariant"
-# Fallback for T2m when ERA5_DAILY missing (e.g. post-2022): use daily MEAN slices
-DATA_SLICE_MEAN_DIR="${F01_ERA5_SLICES:-${ROOT_DIR}/Data/F01_preprocess/era5/slices}"
+# F01 domain-sliced monthly files (primary data source)
+F01_DATA_DIR="${F01_ERA5_DAILY_MEAN:-${DATA_DIR}/F01_preprocess/era5/daily_mean}"
+F01_INVARIANT="${F01_ERA5_INVARIANT:-${DATA_DIR}/F01_preprocess/era5/invariant}"
 
 DATASET="${DATASET:-era5}"
 EVENT="${EVENT:-}"
@@ -175,30 +174,18 @@ plot_date() {
     local year="${target_date:0:4}"
     local month="${target_date:5:2}"
 
-    local T2M="${ERA5_DAILY}/2m_temperature/nc/era5_daily_2m_temperature_${year}.nc"
-    local MSLP="${ERA5_DAILY}/mean_sea_level_pressure/nc/era5_daily_mean_sea_level_pressure_${year}.nc"
-    local SLICE_FILE="${DATA_SLICE_MEAN_DIR}/${year}${month}.nc"
-    local UWIND="${ERA5_DAILY}/u_component_of_wind/nc/era5_daily_u_component_of_wind_${year}.nc"
-    local VWIND="${ERA5_DAILY}/v_component_of_wind/nc/era5_daily_v_component_of_wind_${year}.nc"
-    local TOPO="${ERA5_INVARIANT}/geopotential/nc/era5_invariant_geopotential_20000101.nc"
+    # F01 monthly multi-variable file (t2m, msl, u10, v10, tp in one file)
+    local DATA_FILE="${F01_DATA_DIR}/${year}${month}.nc"
+    local TOPO="${F01_INVARIANT}/geopotential.nc"
 
-    # Fallback: when ERA5 yearly files missing (e.g. post-2022), use data_slice/YYYYMM.nc
-    if [ ! -f "$T2M" ]; then
-        if [ -f "$SLICE_FILE" ]; then
-            T2M="$SLICE_FILE"
-            [ -z "${DATA_SLICE_FALLBACK_LOG:-}" ] && echo "  [INFO] Using F01 daily-mean slice fallback (ERA5_DAILY missing for ${year})"
-        else
-            echo "  [SKIP] ${period}_${idx}_${offset}: T2M not found (tried ERA5 and data_slice) for ${target_date}" && return 1
-        fi
-    fi
-    if [ ! -f "$MSLP" ]; then
-        # data_slice usually has t2m only; use NONE so plot skips MSLP layer
-        MSLP="NONE"
+    if [ ! -f "$DATA_FILE" ]; then
+        echo "  [SKIP] ${period}_${idx}_${offset}: data file not found for ${target_date}: ${DATA_FILE}" && return 1
     fi
 
-    # Optional wind files
-    [ ! -f "$UWIND" ] && UWIND="NONE"
-    [ ! -f "$VWIND" ] && VWIND="NONE"
+    local T2M="$DATA_FILE"
+    local MSLP="$DATA_FILE"
+    local UWIND="$DATA_FILE"
+    local VWIND="$DATA_FILE"
     [ ! -f "$TOPO" ] && TOPO="NONE"
 
     # Create filename using analogue index and offset (offset written as e.g. -7, 0, 7)

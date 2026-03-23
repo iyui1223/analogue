@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """
+DEPRECATED: Use Python/preprocess_era5.py instead.
+The new pipeline sources from heavy/ and domain-slices locally
+rather than downloading from CDS.
+
 ERA5 daily-mean slice downloader for F01 preprocessing.
 
 Downloads pre-sliced ERA5 data from CDS (derived-era5-single-levels-daily-statistics):

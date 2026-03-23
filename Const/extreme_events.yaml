@@ -72,34 +72,3 @@ events:
       lon_min: 280.0   # 80W (0–360)
       lon_max: 310.0   # 50W (0–360)
 
-  # -------------------------------------------------------------------------
-  # European Events (example/reference)
-  # -------------------------------------------------------------------------
-  
-  # European Heatwave 2023
-  - name: "europe_heatwave_2023"
-    description: "July 2023 European heatwave"
-    start_date: "2023-07-15"
-    end_date: "2023-07-20"
-    projection: "latlon"  # Standard lat-lon projection for mid-latitude events
-    region:
-      lat_min: 35.0
-      lat_max: 60.0
-      lon_min: 345.0   # -15 + 360
-      lon_max: 30.0    # crosses 0 meridian
-    urban_areas:
-      - name: "London"
-        lat_min: 51.3
-        lat_max: 51.7
-        lon_min: -0.5
-        lon_max: 0.3
-      - name: "Paris"
-        lat_min: 48.7
-        lat_max: 49.0
-        lon_min: 2.2
-        lon_max: 2.5
-      - name: "Madrid"
-        lat_min: 40.3
-        lat_max: 40.5
-        lon_min: -3.8
-        lon_max: -3.6

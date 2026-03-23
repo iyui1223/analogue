@@ -38,7 +38,9 @@ CONST_DIR="${ROOT_DIR}/Const"
 PYTHON_DIR="${ROOT_DIR}/Python"
 
 FIGS_BASE="${ROOT_DIR}/Figs/F03_visualization"
-ERA5_DAILY="${ERA5_DIR}/daily"
+# Z500 requires pressure-level data (not part of F01 surface preprocess).
+# Point ERA5_PL_DAILY at your local copy, or fall back to SOGE shared data.
+ERA5_PL_DAILY="${ERA5_PL_DAILY:-/lustre/soge1/data/analysis/era5/0.28125x0.28125/daily}"
 
 DATASET="${DATASET:-era5}"
 EVENT="${EVENT:-}"
@@ -176,7 +178,7 @@ era5_file() {
     local d="$2"
     local year="${d:0:4}"
     local month="${d:5:2}"
-    echo "${ERA5_DAILY}/${varname}/nc/era5_daily_${varname}_${year}_${month}.nc"
+    echo "${ERA5_PL_DAILY}/${varname}/nc/era5_daily_${varname}_${year}_${month}.nc"
 }
 
 # =============================================================================

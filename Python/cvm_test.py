@@ -22,6 +22,7 @@ import os
 import tempfile
 import zipfile
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -33,7 +34,11 @@ from scipy import stats
 # Reuse constants from plot_t2m_boxplot
 K2C = 273.15
 LAND_THRESHOLD = 0.5
-DEFAULT_LSM_PATH = "/lustre/soge1/data/analysis/era5/0.28125x0.28125/invariant/land-sea_mask/nc/era5_invariant_land-sea_mask_20000101.nc"
+DEFAULT_LSM_PATH = os.environ.get(
+    "ERA5_LSM_PATH",
+    str(Path(__file__).resolve().parent.parent
+        / "Data" / "F01_preprocess" / "era5" / "invariant" / "land_sea_mask.nc"),
+)
 DEFAULT_NMEMBERS = 15
 
 def load_event_config(yaml_path: str, event_name: str) -> dict:

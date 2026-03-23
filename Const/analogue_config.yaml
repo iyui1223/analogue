@@ -3,7 +3,7 @@
 # =============================================================================
 
 # Number of analogues to select per target day
-n_analogues: 15
+n_analogues: 30
 
 # Similarity metric: rmse, correlation
 similarity_metric: "rmse"
