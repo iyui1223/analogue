@@ -1,19 +1,29 @@
-# Analogue Weather Analysis Pipeline - Python Dependencies
+# Analogue Weather Analysis Pipeline - runtime dependencies (F01-F03)
 # Install with: pip install -r requirements.txt
+#
+# Poetry is the canonical manifest (see pyproject.toml). This file is a
+# pip-only fallback for machines where Poetry is unavailable.
+#
+# F04 (vertical cross sections) uses Metview and is deliberately NOT
+# listed here -- use the separate conda env `maproom` instead.
 
 # Core scientific computing
-numpy>=1.20.0
-scipy>=1.7.0
-pandas>=1.3.0
+numpy>=1.26.0
+scipy>=1.11.0
+pandas>=2.2.0
 
 # NetCDF and climate data handling
-xarray>=0.19.0
-netCDF4>=1.5.0
-dask>=2021.6.0
+xarray>=2024.1.0
+netCDF4>=1.6.5
+dask[complete]>=2024.1.0
 
 # Configuration
-pyyaml>=5.4.0
+pyyaml>=6.0.0
 
-# Optional: Visualization (for future F04)
-# matplotlib>=3.4.0
-# cartopy>=0.19.0
+# Visualization (F03 Python plots)
+matplotlib>=3.8.0
+cartopy>=0.23.0
+
+# ECMWF/CDS downloader client (F01 download). Pure-Python, no heavy
+# binary dependencies -- safe to keep in the core environment.
+cdsapi>=0.7.7

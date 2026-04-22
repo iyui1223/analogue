@@ -26,7 +26,15 @@ set -e
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
-ROOT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue"
+if [ -f Const/env_setting.sh ]; then
+    source Const/env_setting.sh
+elif [ -f ../Const/env_setting.sh ]; then
+    source ../Const/env_setting.sh
+else
+    echo "ERROR: Could not locate Const/env_setting.sh from current working directory: $(pwd)"
+    exit 1
+fi
+
 SCRIPT_DIR="${ROOT_DIR}/Sh"
 LOG_DIR="${ROOT_DIR}/Log"
 
@@ -114,7 +122,7 @@ get_preprocess_script() {
     case "$ds" in
         era5)  echo "${SCRIPT_DIR}/F01_download_era5_slurm.sh" ;;
         mswx)  echo "${SCRIPT_DIR}/preprocess_mswx_slurm.sh" ;;
-        jra3q) echo "${SCRIPT_DIR}/preprocess_jra3q_slurm.sh" ;;
+        jra3q) echo "${SCRIPT_DIR}/F01_preprocess_jra3q_slurm.sh" ;;
     esac
 }
 

@@ -2,12 +2,11 @@
 #SBATCH --job-name=F02_analogue
 #SBATCH --output=../Log/F02_analogue_search.out
 #SBATCH --error=../Log/F02_analogue_search.err
-#SBATCH --partition=icelake
-#SBATCH --account=CRANMER-SL3-CPU
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH --partition=Interactive
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=48G
+#SBATCH --mem=12G
 #SBATCH --time=01:00:00
 
 # =============================================================================
@@ -34,11 +33,19 @@ set -e  # Exit on error
 # -----------------------------------------------------------------------------
 # Load environment settings (venv with poetry must be activated)
 # -----------------------------------------------------------------------------
-cd /lustre/soge1/projects/andante/cenv1201/proj/analogue
-source Const/env_setting.sh
+if [ -f ../Const/env_setting.sh ]; then
+    source ../Const/env_setting.sh
+elif [ -f Const/env_setting.sh ]; then
+    source Const/env_setting.sh
+else
+    echo "ERROR: Could not locate Const/env_setting.sh from current working directory: $(pwd)"
+    exit 1
+fi
 
-if ! command -v poetry &>/dev/null; then
-    echo "ERROR: poetry not found. Ensure Const/env_setting.sh activates the venv that contains poetry."
+cd "${ROOT_DIR}"
+
+if ! ensure_poetry_env "${ROOT_DIR}"; then
+    echo "ERROR: Failed to prepare Poetry environment."
     exit 1
 fi
 
@@ -112,9 +119,9 @@ else
     echo "Step 1: Pre-slicing anomaly data..."
     # Use sequential mode for reliability (avoids HDF5/netCDF threading issues)
     export HDF5_USE_FILE_LOCKING=FALSE
-    SLICE_CMD="poetry run python3 Python/dask_slice.py --dataset $DATASET --event $EVENT --sequential"
-    echo "Running: $SLICE_CMD"
-    eval $SLICE_CMD || {
+    SLICE_CMD=(run_poetry run python3 Python/dask_slice.py --dataset "$DATASET" --event "$EVENT" --sequential)
+    echo "Running: ${SLICE_CMD[*]}"
+    "${SLICE_CMD[@]}" || {
         echo "ERROR: Pre-slicing failed."
         exit 1
     }
@@ -131,13 +138,13 @@ fi
 echo ""
 
 # Build command with optional period argument
-CMD="poetry run python3 Python/analogue_search.py --dataset $DATASET --event $EVENT --force"
+CMD=(run_poetry run python3 Python/analogue_search.py --dataset "$DATASET" --event "$EVENT" --force)
 if [ -n "$PERIOD" ]; then
-    CMD="$CMD --period $PERIOD"
+    CMD+=(--period "$PERIOD")
 fi
 
-echo "Running: $CMD"
-eval $CMD
+echo "Running: ${CMD[*]}"
+"${CMD[@]}"
 
 if [ $? -eq 0 ]; then
     echo ""

@@ -27,6 +27,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 source "${ROOT_DIR}/Const/env_setting.sh"
+if ! ensure_poetry_env "${ROOT_DIR}"; then
+    echo "ERROR: Failed to prepare Poetry environment."
+    exit 1
+fi
 
 PYTHON_DIR="${ROOT_DIR}/Python"
 FIGS_BASE="${ROOT_DIR}/Figs/F03_visualization"
@@ -95,11 +99,11 @@ if [ ! -f "$PY_SCRIPT" ]; then
     exit 1
 fi
 
-CVM_ARGS="--data-dir $DATA_SLICE_DIR --analogues $ANALOGUES_FILE --events-yaml $EVENTS_FILE --event $EVENT --outdir $OUTPUT_DIR --nmembers $NMEMBERS"
-[ "${NO_LAND_MASK:-0}" = "1" ] && CVM_ARGS="$CVM_ARGS --no-land-mask"
-[ -n "${NPERM:-}" ] && CVM_ARGS="$CVM_ARGS --nperm $NPERM"
+CVM_ARGS=(--data-dir "$DATA_SLICE_DIR" --analogues "$ANALOGUES_FILE" --events-yaml "$EVENTS_FILE" --event "$EVENT" --outdir "$OUTPUT_DIR" --nmembers "$NMEMBERS")
+[ "${NO_LAND_MASK:-0}" = "1" ] && CVM_ARGS+=(--no-land-mask)
+[ -n "${NPERM:-}" ] && CVM_ARGS+=(--nperm "$NPERM")
 
-python3 "$PY_SCRIPT" $CVM_ARGS
+run_poetry run python3 "$PY_SCRIPT" "${CVM_ARGS[@]}"
 
 echo ""
 echo "============================================================"

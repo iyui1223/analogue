@@ -27,6 +27,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 source "${ROOT_DIR}/Const/env_setting.sh"
+if ! ensure_poetry_env "${ROOT_DIR}"; then
+    echo "ERROR: Failed to prepare Poetry environment."
+    exit 1
+fi
 
 CONST_DIR="${ROOT_DIR}/Const"
 PYTHON_DIR="${ROOT_DIR}/Python"
@@ -139,7 +143,7 @@ if [ ! -f "$PY_SCRIPT" ]; then
 fi
 
 echo "Running index scatter plots..."
-python3 "$PY_SCRIPT" \
+run_poetry run python3 "$PY_SCRIPT" \
     --analogues "$ANALOGUES_FILE" \
     --nina "$NINA34_FILE" \
     --pdo "$PDO_FILE" \

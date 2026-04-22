@@ -3,8 +3,8 @@
 # This script downloaded global ERA5 from CDS. The new pipeline
 # sources from heavy/ and domain-slices locally.
 #SBATCH --job-name=F01_download_era5
-#SBATCH --output=/lustre/soge1/projects/andante/cenv1201/proj/analogue/Log/F01_download_era5_%j.out
-#SBATCH --error=/lustre/soge1/projects/andante/cenv1201/proj/analogue/Log/F01_download_era5_%j.err
+#SBATCH --output=../Log/F01_download_era5_%j.out
+#SBATCH --error=../Log/F01_download_era5_%j.err
 #SBATCH --partition=Long
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -31,15 +31,26 @@
 
 set -e
 
-ROOT_DIR="/lustre/soge1/projects/andante/cenv1201/proj/analogue"
-source "${ROOT_DIR}/Const/env_setting.sh"
+if [ -f ../Const/env_setting.sh ]; then
+    source ../Const/env_setting.sh
+elif [ -f Const/env_setting.sh ]; then
+    source Const/env_setting.sh
+else
+    echo "ERROR: Could not locate Const/env_setting.sh from current working directory: $(pwd)"
+    exit 1
+fi
+
+cd "${ROOT_DIR}"
+
+if ! ensure_poetry_env "${ROOT_DIR}"; then
+    echo "ERROR: Failed to prepare Poetry environment."
+    exit 1
+fi
 
 OUTPUT_DIR="${F01_ERA5_SLICES:-${DATA_DIR}/F01_preprocess/era5}"
 mkdir -p "$OUTPUT_DIR"
 
 export CDSAPI_RC="/hn01-home/cenv1201/.cdsapirc"
-
-cd "$ROOT_DIR"
 
 echo "============================================================"
 echo "F01: ERA5 Daily-Mean Slice Download"
@@ -54,7 +65,7 @@ export OUTPUT_DIR
 export START_YEAR="${START_YEAR:-$ERA5_START_YEAR}"
 export END_YEAR="${END_YEAR:-$END_YEAR}"
 
-python3 "${ROOT_DIR}/Python/download_era5_slices.py"
+run_poetry run python3 "${ROOT_DIR}/Python/download_era5_slices.py"
 
 echo ""
 echo "============================================================"

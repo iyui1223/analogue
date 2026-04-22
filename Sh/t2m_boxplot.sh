@@ -27,6 +27,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 source "${ROOT_DIR}/Const/env_setting.sh"
+if ! ensure_poetry_env "${ROOT_DIR}"; then
+    echo "ERROR: Failed to prepare Poetry environment."
+    exit 1
+fi
 
 CONST_DIR="${ROOT_DIR}/Const"
 PYTHON_DIR="${ROOT_DIR}/Python"
@@ -99,11 +103,11 @@ if [ ! -f "$PY_SCRIPT" ]; then
     exit 1
 fi
 
-BOXPLOT_ARGS="--data-dir $DATA_SLICE_DIR --analogues $ANALOGUES_FILE --events-yaml $EVENTS_FILE --event $EVENT --outdir $OUTPUT_DIR --ntop $NTOP"
+BOXPLOT_ARGS=(--data-dir "$DATA_SLICE_DIR" --analogues "$ANALOGUES_FILE" --events-yaml "$EVENTS_FILE" --event "$EVENT" --outdir "$OUTPUT_DIR" --ntop "$NTOP")
 # Optional: skip land mask (default: use land only)
-[ "${NO_LAND_MASK:-0}" = "1" ] && BOXPLOT_ARGS="$BOXPLOT_ARGS --no-land-mask"
+[ "${NO_LAND_MASK:-0}" = "1" ] && BOXPLOT_ARGS+=(--no-land-mask)
 
-python3 "$PY_SCRIPT" $BOXPLOT_ARGS
+run_poetry run python3 "$PY_SCRIPT" "${BOXPLOT_ARGS[@]}"
 
 echo ""
 echo "============================================================"

@@ -21,6 +21,13 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 source "${ROOT_DIR}/Const/env_setting.sh"
 
+cd "$ROOT_DIR"
+
+if ! ensure_poetry_env "${ROOT_DIR}"; then
+    echo "ERROR: Failed to prepare Poetry environment."
+    exit 1
+fi
+
 OUTPUT_DIR="${F01_ERA5_SLICES:-${DATA_DIR}/F01_preprocess/era5/slices}"
 mkdir -p "$OUTPUT_DIR"
 
@@ -28,5 +35,4 @@ export OUTPUT_DIR
 export START_YEAR="${START_YEAR:-$ERA5_START_YEAR}"
 export END_YEAR="${END_YEAR:-$END_YEAR}"
 
-cd "$ROOT_DIR"
-python3 "${ROOT_DIR}/Python/download_era5_slices.py"
+run_poetry run python3 "${ROOT_DIR}/Python/download_era5_slices.py"

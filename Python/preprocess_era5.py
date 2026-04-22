@@ -21,6 +21,7 @@ Env (all overridable via CLI):
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -102,7 +103,10 @@ def process_file(
             return False
 
         dst.parent.mkdir(parents=True, exist_ok=True)
-        dst_tmp.rename(dst) if dst_tmp.exists() else None
+        if dst_tmp.exists():
+            # /tmp and project storage can be different filesystems (EXDEV).
+            # shutil.move safely falls back to copy+remove across devices.
+            shutil.move(str(dst_tmp), str(dst))
 
     return dst.exists()
 

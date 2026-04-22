@@ -24,8 +24,12 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 source "${ROOT_DIR}/Const/env_setting.sh"
 
-source /soge-home/users/cenv1201/miniconda3/etc/profile.d/conda.sh 
-conda activate maproom # needs separate environment for Metview
+# F04 intentionally stays OUTSIDE the project Poetry env (F01-F03).
+# Metview requires the ECMWF Metview binary, which is distributed via
+# conda-forge and cannot be installed cleanly with pip/Poetry. The
+# 'maproom' conda env already has metview + cdsapi + cfgrib + eccodes.
+source /soge-home/users/cenv1201/miniconda3/etc/profile.d/conda.sh
+conda activate maproom
 
 export ROOT_DIR
 export FIGS_DIR="${FIGS_DIR:-${ROOT_DIR}/Figs}"

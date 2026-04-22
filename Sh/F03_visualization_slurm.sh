@@ -57,6 +57,14 @@ DO_SCATTER="${DO_SCATTER:-0}"
 NTOP="${NTOP:-30}"
 NMEMBERS="${NMEMBERS:-30}"
 
+# Prepare Poetry env only when Python-based F03 steps are enabled.
+if [ "$DO_BOXPLOT" = "1" ] || [ "$DO_CVM" = "1" ] || [ "$DO_SCATTER" = "1" ]; then
+    if ! ensure_poetry_env "${ROOT_DIR}"; then
+        echo "ERROR: Failed to prepare Poetry environment."
+        exit 1
+    fi
+fi
+
 echo "============================================================"
 echo "F03: Visualization Pipeline — Master Dispatcher"
 echo "============================================================"
