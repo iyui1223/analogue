@@ -1,6 +1,7 @@
 # (C) Copyright 2017- ECMWF.
-# Vertical cross section for Antarctic Peninsula event 2020-02-08 19 UTC.
-# Plots: T (shaded −40…18 °C, cold/warm spacing), cloud, EPT, wind, precipitation (bar chart).
+# Generic vertical cross section plotter with 2015-style settings by default.
+# Runtime date/output are controlled via CROSS_* environment variables.
+# Plots: T (shaded −40…18 °C, cold/warm spacing), cloud, EPT, wind, precip.
 # Outputs: PNG (quick check), PDF, EPS (publication).
 # Requires Metview >= 5.16.0 and ~/.cdsapirc for CDS API.
 
@@ -8,23 +9,47 @@ import os
 import metview as mv
 import numpy as np
 
-# ---- Event-specific configuration (2020 Feb 08) ----
-date_str = "2020-02-08"
-time_str = "19:00"  # UTC
-area = [-55, -135, -85, -35]  # N, W, S, E
-line = [-63.8, -66.5, -68.1, -56.8]  # cross section: [lat1, lon1, lat2, lon2]
+def _env_bool(name, default):
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _env_float(name, default):
+    raw = os.environ.get(name)
+    if raw is None or str(raw).strip() == "":
+        return float(default)
+    return float(raw)
+
+
+def _env_float_list(name, default, expected_len):
+    raw = os.environ.get(name)
+    if raw is None or str(raw).strip() == "":
+        return list(default)
+    values = [float(x.strip()) for x in str(raw).split(",") if x.strip() != ""]
+    if len(values) != expected_len:
+        raise ValueError(f"{name} requires {expected_len} comma-separated values")
+    return values
+
+
+# ---- Runtime configuration (2015 style defaults) ----
+date_str = os.environ.get("CROSS_DATE", "2015-03-24")
+time_str = os.environ.get("CROSS_TIME", "19:00")
+area = _env_float_list("CROSS_AREA", [-55, -135, -85, -35], 4)
+line = _env_float_list("CROSS_LINE", [-63.8, -66.5, -68.1, -56.8], 4)
 
 # ---- Common configuration ----
-use_cds = True
-top_level = 10000  # m
-bottom_level = 0
-level_count = 101
-w_scale_factor = 100
-cloud_hatch_threshold = 0.2
-use_vertical_velocity = True
-# Feb events: smaller ref. velocity & precip scale than March 2015 cross section
-wind_arrow_unit_velocity = 30
-wind_legend_lead_spaces = "          "
+use_cds = _env_bool("CROSS_USE_CDS", True)
+top_level = int(_env_float("CROSS_TOP_LEVEL", 10000))
+bottom_level = int(_env_float("CROSS_BOTTOM_LEVEL", 0))
+level_count = int(_env_float("CROSS_LEVEL_COUNT", 101))
+w_scale_factor = _env_float("CROSS_W_SCALE_FACTOR", 100)
+cloud_hatch_threshold = _env_float("CROSS_CLOUD_HATCH_THRESHOLD", 0.2)
+use_vertical_velocity = _env_bool("CROSS_USE_VERTICAL_VELOCITY", True)
+# Wind legend: reference arrow length (m/s); leading spaces separate title from colour bar
+wind_arrow_unit_velocity = _env_float("CROSS_WIND_ARROW_UNIT_VELOCITY", 90)
+wind_legend_lead_spaces = os.environ.get("CROSS_WIND_LEGEND_LEAD_SPACES", "          ")
 
 pressure_levels = [
     "100", "150", "200", "250", "300", "400", "500",
@@ -35,7 +60,7 @@ pressure_levels = [
 ROOT_DIR = os.environ.get("ROOT_DIR", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FIGS_DIR = os.environ.get("FIGS_DIR", os.path.join(ROOT_DIR, "Figs"))
 WORK_DIR = os.environ.get("WORK_DIR", os.path.join(ROOT_DIR, "Work"))
-EVENT_ID = "antarctica_peninsula_2020"
+EVENT_ID = os.environ.get("CROSS_EVENT_ID", "antarctica_peninsula_generic")
 
 work_subdir = os.path.join(WORK_DIR, f"cross_section_{EVENT_ID}")
 out_dir = os.path.join(FIGS_DIR, "cross_section", EVENT_ID)
@@ -44,7 +69,7 @@ os.makedirs(out_dir, exist_ok=True)
 
 filename_pl = os.path.join(work_subdir, "era5_pl_cross_section.grib")
 filename_sfc = os.path.join(work_subdir, "era5_sfc_geopotential_precip.grib")
-output_base = "cross_section_wind3d_height_era5"
+output_base = os.environ.get("CROSS_OUTPUT_BASE", "cross_section_wind3d_height_era5")
 
 # ---- Retrieve or load data ----
 if use_cds:
@@ -265,7 +290,10 @@ def _temperature_colours_for_metview(
     cold_interval=4.0,
     warm_interval=2.0,
 ):
-    """rgb(r,g,b) strings for each shaded band between consecutive levels."""
+    """
+    rgb(r,g,b) strings for each shaded band between consecutive levels.
+    Cold side: grey → purple → blue → light blue; warm: yellow → orange → red.
+    """
     levels = _temperature_level_list(t_min, t_max, cold_interval, warm_interval)
     cold_n = 0
     warm_n = 0
@@ -401,7 +429,7 @@ xs_view = mv.mxsectview(
     subpage_y_length=82,
 )
 
-legend = mv.mlegend(legend_text_font_size=0.8)
+legend = mv.mlegend(legend_text_font_size=0.6)
 
 vdate = mv.valid_date(t[0])
 wind_label = f"3D Wind (w×{w_scale_factor})" if has_w else "2D Wind"
@@ -410,11 +438,11 @@ title = mv.mtext(
         f"ERA5 T (°C), EPT and {wind_label}",
         vdate.strftime("%Y-%m-%d %H UTC"),
     ],
-    text_font_size=0.8,
+    text_font_size=0.6,
 )
 
 # ---- Precipitation ----
-precip_ymax = 1.2
+precip_ymax = _env_float("CROSS_PRECIP_YMAX", 4.0)
 has_precip = False
 precip_vals = []
 dist_vals = []
@@ -450,9 +478,9 @@ v_axis_precip = mv.maxis(
     axis_tick_label_height=0.6,
     axis_title_height=0.6,
     axis_type="position_list",
-    axis_tick_position_list=[0, -0.2, -0.4, -0.6, -0.8, -1.0, -1.2],
+    axis_tick_position_list=[0, -1, -2, -3, -4],
     axis_tick_label_type="label_list",
-    axis_tick_label_list=["0", "0.2", "0.4", "0.6", "0.8", "1.0", "1.2"],
+    axis_tick_label_list=["0", "1", "2", "3", "4"],
 )
 curve_view = mv.cartesianview(
     x_automatic="on",
@@ -492,7 +520,7 @@ if has_precip:
         dw[0],
         precip_vis,
         precip_graph,
-        mv.mtext(text_lines="", text_font_size=0.8),
+        mv.mtext(text_lines="", text_font_size=0.6),
         dw[1],
         xs_view,
         xs_t,
@@ -521,13 +549,8 @@ else:
         title,
     ]
 
-# ---- Output: PNG (quick check), PDF, EPS (publication) ----
+# ---- Output: PNG only ----
 output_path_base = os.path.join(out_dir, output_base)
-for fmt, out_driver in [
-    ("png", mv.png_output(output_name=output_path_base)),
-    ("pdf", mv.pdf_output(output_name=output_path_base)),
-    ("eps", mv.eps_output(output_name=output_path_base)),
-]:
-    mv.setoutput(out_driver)
-    mv.plot(*plot_def)
-    print(f"Wrote {output_path_base}.{fmt}")
+mv.setoutput(mv.png_output(output_name=output_path_base))
+mv.plot(*plot_def)
+print(f"Wrote {output_path_base}.png")

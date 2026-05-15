@@ -331,13 +331,13 @@ GSDRAW
 
 * Title
 'set string 1 c 6'
-'set strsiz 0.18'
+'set strsiz 0.216'
 'draw string 5.5 8.3 ${panel_title}  |  ${DESCRIPTION}'
-'set strsiz 0.13'
+'set strsiz 0.156'
 'draw string 5.5 7.95 Snapshot: ${SNAPSHOT}  |  Contours: ${clevs}'
 
 * Legend (colour key)
-'set strsiz 0.10'
+'set strsiz 0.12'
 'set string 1 l 4'
 'draw string 0.5 1.35 Black: target  |  Blue: past top-${N_TOP}  |  Red: present top-${N_TOP}  |  Snapshot date only'
 

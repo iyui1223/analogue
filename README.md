@@ -12,6 +12,36 @@ sbatch Sh/F01_preprocess_slurm.sh   # Preprocessing
 sbatch Sh/F02_analogue_search_slurm.sh  # Analogue search (after F01)
 ```
 
+## Environments
+
+The pipeline uses two Python environments:
+
+- **F01–F03: single Poetry env** (numpy, scipy, pandas, xarray, netCDF4,
+  dask, pyyaml, matplotlib, cartopy, cdsapi). Poetry is configured with
+  `POETRY_VIRTUALENVS_CREATE=false` and installs into the bootstrap venv
+  `~/venvs/starter` that is activated by `Const/env_setting.sh`.
+- **F04: conda env `maproom`** (Metview + cdsapi + cfgrib + eccodes).
+  Metview requires the ECMWF Metview binary from conda-forge and cannot
+  be installed cleanly via pip/Poetry, so F04 is kept isolated.
+
+One-time provisioning on the login node:
+
+```bash
+source ~/venvs/starter/bin/activate
+cd /lustre/soge1/projects/andante/cenv1201/proj/analogue
+poetry install --no-root
+```
+
+A pip-only fallback is also available:
+
+```bash
+pip install -r requirements.txt
+```
+
+Slurm jobs for F01–F03 do not need any extra activation: `Const/env_setting.sh`
+takes care of sourcing the starter venv and `ensure_poetry_env` verifies
+the imports before each Python step.
+
 ## Pipeline
 
 | Stage | Tool | Description |

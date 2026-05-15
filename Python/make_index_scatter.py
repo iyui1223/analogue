@@ -261,6 +261,16 @@ def main():
                    help="YYYY-MM-DD snapshot/target date to highlight")
     args = p.parse_args()
 
+    plt.rcParams.update({
+        'font.size': 12,
+        'axes.titlesize': 14,
+        'axes.labelsize': 12,
+        'xtick.labelsize': 11,
+        'ytick.labelsize': 11,
+        'legend.fontsize': 10,
+        'legend.title_fontsize': 11,
+    })
+
     analogues = read_analogues(args.analogues)
     if analogues is None:
         analogues = []

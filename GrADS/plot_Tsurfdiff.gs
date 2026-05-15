@@ -224,13 +224,13 @@ if (period = 'present')
 endif
 
 'set string 1 c 6'
-'set strsiz 0.18'
+'set strsiz 0.216'
 'draw string 5.5 8.3 ' % title_prefix % ' diff: ' % title
 
-'set strsiz 0.13'
+'set strsiz 0.156'
 'draw string 5.5 7.95 Target: ' % orig_date % '    Analogue: ' % anal_date
 
-'set strsiz 0.10'
+'set strsiz 0.12'
 'set string 1 c 4'
 'draw string 5.5 1.55 Shading: T2m difference (C) | Black dashed: target MSLP (4hPa) | ' % contour_lbl
 

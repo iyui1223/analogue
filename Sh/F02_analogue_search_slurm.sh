@@ -58,7 +58,7 @@ fi
 #   PERIOD=present sbatch ... # Process only present period (1988-2026)
 # -----------------------------------------------------------------------------
 DATASET="${DATASET:-era5}"
-EVENT="${EVENT:-antarctica_peninsula_2020}"
+EVENT="${EVENT:-antarctica_peninsula_2022}"
 PERIOD="${PERIOD:-}"  # Empty = process both periods
 SKIP_CDO="${SKIP_CDO:-false}"  # Skip CDO pre-slicing, use Python/dask lazy loading instead
 

@@ -381,16 +381,16 @@ wind_style = mv.mwind(
 
 vertical_axis = mv.maxis(
     axis_orientation="vertical",
-    axis_title_text="Height ASL (m)",
-    axis_tick_label_height=0.5,
-    axis_title_height=0.5,
+    axis_title_text="Height (m)",
+    axis_tick_label_height=0.6,
+    axis_title_height=0.6,
     axis_title_position=100,
 )
 
 horizontal_axis = mv.maxis(
     axis_orientation="horizontal",
-    axis_tick_label_height=0.5,
-    axis_title_height=0.5,
+    axis_tick_label_height=0.6,
+    axis_title_height=0.6,
 )
 
 xs_view = mv.mxsectview(
@@ -405,7 +405,7 @@ xs_view = mv.mxsectview(
     subpage_y_length=82,
 )
 
-legend = mv.mlegend(legend_text_font_size=0.5)
+legend = mv.mlegend(legend_text_font_size=0.8)
 
 vdate = mv.valid_date(t[0])
 wind_label = f"3D Wind (w×{w_scale_factor})" if has_w else "2D Wind"
@@ -414,7 +414,7 @@ title = mv.mtext(
         f"ERA5 T (°C), EPT and {wind_label}",
         vdate.strftime("%Y-%m-%d %H UTC"),
     ],
-    text_font_size=0.5,
+    text_font_size=0.8,
 )
 
 # ---- Precipitation ----
@@ -445,14 +445,14 @@ page_xs = mv.plot_page(top=0, bottom=72, left=0, right=100, view=xs_view)
 
 h_axis_precip = mv.maxis(
     axis_orientation="horizontal",
-    axis_tick_label_height=0.5,
-    axis_title_height=0.5,
+    axis_tick_label_height=0.6,
+    axis_title_height=0.6,
 )
 v_axis_precip = mv.maxis(
     axis_orientation="vertical",
     axis_title_text="Precip (mm)",
-    axis_tick_label_height=0.5,
-    axis_title_height=0.5,
+    axis_tick_label_height=0.6,
+    axis_title_height=0.6,
     axis_type="position_list",
     axis_tick_position_list=[0, -1, -2, -3, -4],
     axis_tick_label_type="label_list",
@@ -496,7 +496,7 @@ if has_precip:
         dw[0],
         precip_vis,
         precip_graph,
-        mv.mtext(text_lines="", text_font_size=0.5),
+        mv.mtext(text_lines="", text_font_size=0.8),
         dw[1],
         xs_view,
         xs_t,

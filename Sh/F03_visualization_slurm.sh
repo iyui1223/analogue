@@ -2,7 +2,7 @@
 #SBATCH --job-name=F03_visualization
 #SBATCH --output=/lustre/soge1/projects/andante/cenv1201/proj/analogue/Log/F03_visualization.out
 #SBATCH --error=/lustre/soge1/projects/andante/cenv1201/proj/analogue/Log/F03_visualization.err
-#SBATCH --partition=Long
+#SBATCH --partition=Interactive
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
@@ -29,6 +29,7 @@
 #   DO_TSURFDIFF=1 sbatch ...                          # run Tsurf difference maps
 #   DO_SPAGHETTI=1 sbatch ...                          # run spaghetti plots
 #   DO_BOXPLOT=1 sbatch ...                            # run T2m box plot (default on)
+#   DO_EAST_SLOPE_BOXPLOT=0 sbatch ...                 # skip extra east-slope box plot
 #   DO_CVM=1 sbatch ...                                # run CvM test (default on)
 #   DO_SCATTER=1 sbatch ...                            # run index scatter (default on)
 #
@@ -48,14 +49,16 @@ echo "Using GrADS: ${GRADS_CMD}"
 # Dataset and event can be overridden via environment variables
 DATASET="${DATASET:-era5}"
 #EVENT="antarctica_peninsula_2022"
-DO_TSURF="${DO_TSURF:-0}"
-DO_TSURFDIFF="${DO_TSURFDIFF:-0}"
+DO_TSURF="${DO_TSURF:-0}" # heavy lots of figures
+DO_TSURFDIFF="${DO_TSURFDIFF:-0}" # heavy lots of figures 
 DO_SPAGHETTI="${DO_SPAGHETTI:-0}"
 DO_BOXPLOT="${DO_BOXPLOT:-1}"
-DO_CVM="${DO_CVM:-1}"
+DO_EAST_SLOPE_BOXPLOT="${DO_EAST_SLOPE_BOXPLOT:-1}"
+DO_CVM="${DO_CVM:-0}"
 DO_SCATTER="${DO_SCATTER:-0}"
 NTOP="${NTOP:-30}"
 NMEMBERS="${NMEMBERS:-30}"
+export DO_EAST_SLOPE_BOXPLOT
 
 # Prepare Poetry env only when Python-based F03 steps are enabled.
 if [ "$DO_BOXPLOT" = "1" ] || [ "$DO_CVM" = "1" ] || [ "$DO_SCATTER" = "1" ]; then
@@ -74,6 +77,7 @@ echo "Do Tsurf:         $DO_TSURF"
 echo "Do Tsurfdiff:     $DO_TSURFDIFF"
 echo "Do Spaghetti:     $DO_SPAGHETTI"
 echo "Do Boxplot:       $DO_BOXPLOT"
+echo "Do East Boxplot:  $DO_EAST_SLOPE_BOXPLOT"
 echo "Do CvM:           $DO_CVM"
 echo "Do Scatter:       $DO_SCATTER"
 echo "Boxplot N top:    $NTOP"

@@ -56,7 +56,7 @@ else
 endif
 
 'set string 1 c 3'
-'set strsiz 'sf*0.09
+'set strsiz 'sf*0.108
 
 * Plot colorbar
 _cnum=0

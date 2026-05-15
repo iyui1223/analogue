@@ -63,6 +63,90 @@ def compute_calendar_mask(
     return mask
 
 
+def _standardize_dataset_coords(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Rename coordinate names to standard lat/lon/time when possible.
+    """
+    coord_renames: Dict[str, str] = {}
+
+    for coord in ds.coords:
+        c = ds.coords[coord]
+        cl = coord.lower()
+        standard_name = str(c.attrs.get("standard_name", "")).lower()
+        axis = str(c.attrs.get("axis", "")).lower()
+        units = str(c.attrs.get("units", "")).lower()
+
+        target = None
+        if (
+            "lat" in cl
+            or standard_name == "latitude"
+            or axis == "y"
+            or "degrees_north" in units
+        ):
+            target = "lat"
+        elif (
+            "lon" in cl
+            or standard_name == "longitude"
+            or axis == "x"
+            or "degrees_east" in units
+        ):
+            target = "lon"
+        elif (
+            "time" in cl
+            or "valid" in cl
+            or standard_name == "time"
+            or axis == "t"
+        ):
+            target = "time"
+
+        if target is None or coord == target:
+            continue
+        if target in ds.coords or target in ds.dims:
+            continue
+        if target in coord_renames.values():
+            continue
+        coord_renames[coord] = target
+
+    if coord_renames:
+        ds = ds.rename(coord_renames)
+    return ds
+
+
+def _select_primary_var(ds: xr.Dataset, preferred_var: Optional[str] = None) -> str:
+    """
+    Select the main geophysical variable, avoiding bounds helper variables.
+    """
+    if preferred_var and preferred_var in ds.data_vars:
+        return preferred_var
+
+    scored = []
+    for name, da in ds.data_vars.items():
+        nl = name.lower()
+        if "bnd" in nl or "bound" in nl:
+            continue
+
+        dims_lower = [d.lower() for d in da.dims]
+        has_lat = any("lat" in d for d in dims_lower)
+        has_lon = any("lon" in d for d in dims_lower)
+        has_time = any(("time" in d) or ("valid" in d) for d in dims_lower)
+
+        score = (3 if has_lat and has_lon else 0) + (1 if has_time else 0) + da.ndim
+        scored.append((score, da.size, name))
+
+    if scored:
+        scored.sort(reverse=True)
+        return scored[0][2]
+
+    non_bounds = [n for n in ds.data_vars if "bnd" not in n.lower() and "bound" not in n.lower()]
+    if non_bounds:
+        return non_bounds[0]
+
+    var_names = list(ds.data_vars)
+    if not var_names:
+        raise ValueError("No data variables in anomaly files")
+    return var_names[0]
+
+
 def create_sliced_anomaly_dask(
     dataset: str,
     var: str,
@@ -155,26 +239,20 @@ def create_sliced_anomaly_dask(
         engine='netcdf4',
     )
     
-    # Get the data variable (first one)
-    var_names = list(ds.data_vars)
-    if not var_names:
-        raise ValueError("No data variables in anomaly files")
-    data_var = ds[var_names[0]]
-    
-    # Standardize coordinate names
-    coord_renames = {}
-    for coord in ds.coords:
-        cl = coord.lower()
-        if 'lat' in cl and coord != 'lat':
-            coord_renames[coord] = 'lat'
-        elif 'lon' in cl and coord != 'lon':
-            coord_renames[coord] = 'lon'
-        elif ('time' in cl or 'valid' in cl) and coord != 'time':
-            coord_renames[coord] = 'time'
-    if coord_renames:
-        data_var = data_var.rename(coord_renames)
+    ds = _standardize_dataset_coords(ds)
+
+    # Select the requested variable when available; avoid bounds vars like time_bnds.
+    selected_var = _select_primary_var(ds, preferred_var=var)
+    data_var = ds[selected_var]
+
+    if "lat" not in data_var.coords or "lon" not in data_var.coords:
+        raise ValueError(
+            f"Selected variable '{selected_var}' has no lat/lon coords. "
+            f"dims={data_var.dims}, coords={list(data_var.coords)}"
+        )
     
     if verbose:
+        print(f"  Using variable: {selected_var}", flush=True)
         print(f"  Loaded shape: {dict(data_var.sizes)}", flush=True)
     
     # Slice to spatial bbox
@@ -212,7 +290,7 @@ def create_sliced_anomaly_dask(
         print("  Writing to NetCDF (this may take a while)...", flush=True)
     
     # Convert to dataset for writing
-    out_ds = data_var.to_dataset(name=var_names[0])
+    out_ds = data_var.to_dataset(name=selected_var)
     
     # Compute time/lat/lon sizes safely
     n_time = data_var.sizes.get('time', len(data_var.time))
@@ -221,7 +299,7 @@ def create_sliced_anomaly_dask(
     
     # Use compression for smaller file
     encoding = {
-        var_names[0]: {
+        selected_var: {
             'zlib': True,
             'complevel': 4,
             'chunksizes': (min(365, n_time), n_lat, n_lon),
@@ -291,18 +369,15 @@ def create_sliced_anomaly_sequential(
         
         # Load single file
         ds = xr.open_dataset(f)
-        var_name = list(ds.data_vars)[0]
+        ds = _standardize_dataset_coords(ds)
+        var_name = _select_primary_var(ds, preferred_var=var)
         data = ds[var_name]
-        
-        # Standardize coords
-        for coord in list(data.coords):
-            cl = coord.lower()
-            if 'lat' in cl and coord != 'lat':
-                data = data.rename({coord: 'lat'})
-            elif 'lon' in cl and coord != 'lon':
-                data = data.rename({coord: 'lon'})
-            elif ('time' in cl or 'valid' in cl) and coord != 'time':
-                data = data.rename({coord: 'time'})
+
+        if "lat" not in data.coords or "lon" not in data.coords:
+            raise ValueError(
+                f"{f.name}: selected variable '{var_name}' has no lat/lon coords. "
+                f"dims={data.dims}, coords={list(data.coords)}"
+            )
         
         # Slice to bbox
         if data.lat[0] > data.lat[-1]:

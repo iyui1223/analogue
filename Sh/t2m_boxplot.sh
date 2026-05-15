@@ -11,11 +11,13 @@
 #
 # Reads:
 #   - Const/extreme_events.yaml (event definitions)
+#   - Const/peninsula_domain_masks.nc (optional eastern-slope domain mask)
 #   - Data/F02_analogue_search/{dataset}/{event}/analogues.csv
 #   - Data/F01_preprocess/era5/t2m_daily_max/YYYYMM.nc (monthly T2m daily max)
 #
 # Output:
 #   Figs/F03_visualization/{event}/{dataset}/t2m_boxplot_top{N}.png
+#   Figs/F03_visualization/{event}/{dataset}/t2m_boxplot_east_slope_top{N}.png
 # =============================================================================
 
 set -eox
@@ -39,10 +41,13 @@ FIGS_BASE="${ROOT_DIR}/Figs/F03_visualization"
 DATASET="${DATASET:-era5}"
 EVENT="${EVENT:-}"
 NTOP="${NTOP:-5}"
+DO_EAST_SLOPE_BOXPLOT="${DO_EAST_SLOPE_BOXPLOT:-1}"
+EAST_SLOPE_MASK_VAR="${EAST_SLOPE_MASK_VAR:-pen_east_slope}"
 
 # Absolute paths (no symlinks)
 DATA_SLICE_DIR="${DATA_SLICE_DIR:-${DATA_DIR}/F01_preprocess/era5/t2m_daily_max}"
 EVENTS_FILE="${ROOT_DIR}/Const/extreme_events.yaml"
+PENINSULA_DOMAIN_MASKS="${PENINSULA_DOMAIN_MASKS:-${CONST_DIR}/peninsula_domain_masks.nc}"
 
 # -----------------------------------------------------------------------------
 # Parse arguments
@@ -90,6 +95,7 @@ echo "Event:      $EVENT"
 echo "Dataset:    $DATASET"
 echo "Data dir:   $DATA_SLICE_DIR"
 echo "Top N:      $NTOP"
+echo "East slope: $DO_EAST_SLOPE_BOXPLOT"
 echo "Output:     $OUTPUT_DIR"
 echo "============================================================"
 
@@ -108,6 +114,19 @@ BOXPLOT_ARGS=(--data-dir "$DATA_SLICE_DIR" --analogues "$ANALOGUES_FILE" --event
 [ "${NO_LAND_MASK:-0}" = "1" ] && BOXPLOT_ARGS+=(--no-land-mask)
 
 run_poetry run python3 "$PY_SCRIPT" "${BOXPLOT_ARGS[@]}"
+
+if [ "$DO_EAST_SLOPE_BOXPLOT" = "1" ]; then
+    if [ ! -f "$PENINSULA_DOMAIN_MASKS" ]; then
+        echo "[WARN] Peninsula domain masks not found; skipping east-slope boxplot: $PENINSULA_DOMAIN_MASKS"
+    else
+        EAST_SLOPE_ARGS=("${BOXPLOT_ARGS[@]}" \
+            --domain-mask "$PENINSULA_DOMAIN_MASKS" \
+            --domain-var "$EAST_SLOPE_MASK_VAR" \
+            --domain-label "East Peninsula slope" \
+            --output-suffix "east_slope")
+        run_poetry run python3 "$PY_SCRIPT" "${EAST_SLOPE_ARGS[@]}"
+    fi
+fi
 
 echo ""
 echo "============================================================"

@@ -251,13 +251,13 @@ if (period = 'present')
 endif
 
 'set string 1 c 6'
-'set strsiz 0.20'
+'set strsiz 0.24'
 'draw string 5.5 8.3 ' % title_prefix % ': ' % title
 
-'set strsiz 0.16'
+'set strsiz 0.192'
 'draw string 5.5 7.95 ' % date_str
 
-'set strsiz 0.10'
+'set strsiz 0.12'
 'set string 1 c 4'
 'draw string 5.5 1.55 Shading: 2m Temp (C) | Gray contours: MSLP (hPa, 4hPa) | Ice-blue line: 0C isotherm'
 

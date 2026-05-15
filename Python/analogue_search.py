@@ -16,6 +16,7 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 import json
 from pathlib import Path
@@ -37,10 +38,15 @@ from data_utils import (
 from spatial_weights import compute_spatial_weights
 
 # #region agent log - Debug logging helper
-DEBUG_LOG = Path.home() / "andante/cenv1201/proj/analogue/.cursor/debug.log"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DEBUG_LOG_DEFAULT = PROJECT_ROOT / "Log" / "analogue_search_debug.ndjson"
+DEBUG_LOG = Path(os.environ.get("ANALOGUE_DEBUG_LOG", str(DEBUG_LOG_DEFAULT)))
+DEBUG_LOG_ENABLED = os.environ.get("ANALOGUE_DEBUG_LOG_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
 
 def debug_log(hypothesis_id: str, location: str, message: str, data: dict):
-    """Append debug log entry to NDJSON file."""
+    """Append debug log entry to NDJSON file (best-effort; never fatal)."""
+    if not DEBUG_LOG_ENABLED:
+        return
     import time
     entry = {
         "hypothesisId": hypothesis_id,
@@ -49,19 +55,55 @@ def debug_log(hypothesis_id: str, location: str, message: str, data: dict):
         "data": data,
         "timestamp": int(time.time())
     }
-    with open(DEBUG_LOG, 'a') as f:
-        f.write(json.dumps(entry) + '\n')
+    try:
+        DEBUG_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with open(DEBUG_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError:
+        # Logging must never break the pipeline.
+        return
 # #endregion
 
 
-def _standardize_coords(ds: xr.Dataset) -> xr.DataArray:
-    """Detect and rename coords to standard names; return data variable."""
+def _select_primary_var(ds: xr.Dataset, expected_var: Optional[str] = None) -> str:
+    """Select main field variable, ignoring bounds helper variables when possible."""
+    if expected_var and expected_var in ds.data_vars:
+        return expected_var
+
+    scored: List[Tuple[int, int, str]] = []
+    for name, da in ds.data_vars.items():
+        nl = name.lower()
+        if "bnd" in nl or "bound" in nl:
+            continue
+
+        dims_lower = [d.lower() for d in da.dims]
+        has_lat = any("lat" in d for d in dims_lower)
+        has_lon = any("lon" in d for d in dims_lower)
+        has_time = any(("time" in d) or ("valid" in d) for d in dims_lower)
+        score = (3 if has_lat and has_lon else 0) + (1 if has_time else 0) + da.ndim
+        scored.append((score, da.size, name))
+
+    if scored:
+        scored.sort(reverse=True)
+        return scored[0][2]
+
+    non_bounds = [n for n in ds.data_vars if "bnd" not in n.lower() and "bound" not in n.lower()]
+    if non_bounds:
+        return non_bounds[0]
+
     var_names = list(ds.data_vars)
-    if len(var_names) == 0:
+    if not var_names:
         raise ValueError("No data variables found in anomaly files")
-    data_var = ds[var_names[0]]
+    return var_names[0]
+
+
+def _standardize_coords(ds: xr.Dataset, expected_var: Optional[str] = None) -> Tuple[xr.DataArray, str]:
+    """Detect and rename coords to standard names; return selected data variable + name."""
+    selected_var = _select_primary_var(ds, expected_var=expected_var)
+    data_var = ds[selected_var]
+
     lat_name = lon_name = time_name = None
-    for coord in ds.coords:
+    for coord in data_var.coords:
         coord_lower = coord.lower()
         if 'lat' in coord_lower:
             lat_name = coord
@@ -80,7 +122,14 @@ def _standardize_coords(ds: xr.Dataset) -> xr.DataArray:
         rename_dict[time_name] = 'time'
     if rename_dict:
         data_var = data_var.rename(rename_dict)
-    return data_var
+
+    if "lat" not in data_var.coords or "lon" not in data_var.coords:
+        raise ValueError(
+            f"Selected variable '{selected_var}' has no lat/lon coords. "
+            f"dims={data_var.dims}, coords={list(data_var.coords)}"
+        )
+
+    return data_var, selected_var
 
 
 def load_anomaly_data(
@@ -124,8 +173,9 @@ def load_anomaly_data(
         if verbose:
             print(f"Loading pre-sliced data: {sliced_path.name}")
         ds = xr.open_dataset(sliced_path, chunks={'time': 365})
-        data_var = _standardize_coords(ds)
+        data_var, selected_var = _standardize_coords(ds, expected_var=var)
         if verbose:
+            print(f"Using variable: {selected_var}")
             print(f"Data shape: {dict(data_var.sizes)}")
         return data_var
 
@@ -167,9 +217,9 @@ def load_anomaly_data(
         chunks={'time': 365}
     )
     
-    data_var = _standardize_coords(ds)
+    data_var, selected_var = _standardize_coords(ds, expected_var=var)
     if verbose:
-        print(f"Using variable: {list(ds.data_vars)[0]}")
+        print(f"Using variable: {selected_var}")
     
     lat_min = region['lat_min']
     lat_max = region['lat_max']

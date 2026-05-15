@@ -124,6 +124,7 @@ export VARS_ALL="pres t2m precip wind10m"
 export PREPROCESS_CONFIG="${ROOT_DIR}/Const/preprocess_config.yaml"
 export ANALOGUE_CONFIG="${ROOT_DIR}/Const/analogue_config.yaml"
 export EVENTS_CONFIG="${ROOT_DIR}/Const/extreme_events.yaml"
+export PENINSULA_DOMAIN_MASKS="${ROOT_DIR}/Const/peninsula_domain_masks.nc"
 
 # Output directories
 export DATA_DIR="${ROOT_DIR}/Data"

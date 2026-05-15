@@ -6,6 +6,9 @@ Uses snapshot-date daily max T2m (domain mean over land in boxplot_region) for e
 analogue member. Compares past vs present distributions with:
   1) CvM test (scipy, asymptotic p-value at α=0.05)
   2) Permutation + CvM (finite-sample, assumption-free p-value)
+  3) Gaussian tail diagnostics: treat analogue sample mean/std as N(μ, σ²) and
+     report where the target event T2m (at snapshot_date) sits — CDF percentile
+     and upper-tail exceedance P(T ≥ target) — separately for past and present.
 
 Sample: analogue members from analogues.csv (snapshot dates only).
 Variable: daily maximum T2m, averaged over land within boxplot_region.
@@ -49,6 +52,32 @@ def load_event_config(yaml_path: str, event_name: str) -> dict:
         if ev.get("name") == event_name:
             return ev
     raise KeyError(f"Event {event_name!r} not found in {yaml_path}")
+
+
+def parse_snapshot_datetime(event_cfg: dict) -> datetime:
+    """Event snapshot date from extreme_events.yaml (YYYY-MM-DD)."""
+    s = event_cfg.get("snapshot_date")
+    if not s:
+        raise KeyError("snapshot_date is required in event config for CvM + Gaussian tail stats")
+    return datetime.strptime(str(s).strip(), "%Y-%m-%d")
+
+
+def gaussian_tail_stats(x0: float, mu: float, sigma: float) -> Optional[dict]:
+    """
+    Under X ~ N(mu, sigma^2), return z-score, CDF percentile (below x0),
+    and upper-tail probability P(X >= x0). Returns None if sigma invalid.
+    """
+    if not np.isfinite(x0) or not np.isfinite(mu) or not np.isfinite(sigma):
+        return None
+    if sigma <= 0:
+        return None
+    z = (x0 - mu) / sigma
+    cdf = float(stats.norm.cdf(z))
+    return {
+        "z": float(z),
+        "cdf_percentile": 100.0 * cdf,
+        "upper_tail_pct": 100.0 * float(stats.norm.sf(z)),
+    }
 
 
 def get_boxplot_bbox(event_cfg: dict) -> tuple:
@@ -308,6 +337,32 @@ def main():
         print("ERROR: Need at least 2 observations per group for CvM test")
         return 1
 
+    mu_past = float(np.mean(past_arr))
+    mu_present = float(np.mean(present_arr))
+    std_past = float(np.std(past_arr, ddof=1))
+    std_present = float(np.std(present_arr, ddof=1))
+
+    snapshot_dt = parse_snapshot_datetime(event_cfg)
+    target_t2m = np.nan
+    try:
+        target_t2m = get_t2m_snapshot_value(
+            snapshot_dt,
+            args.data_dir,
+            lat_min,
+            lat_max,
+            lon_min,
+            lon_max,
+            land_mask,
+        )
+    except FileNotFoundError as e:
+        print(f"WARN: Target snapshot file missing for Gaussian tail stats: {e}")
+
+    gauss_past = None
+    gauss_present = None
+    if np.isfinite(target_t2m):
+        gauss_past = gaussian_tail_stats(target_t2m, mu_past, std_past)
+        gauss_present = gaussian_tail_stats(target_t2m, mu_present, std_present)
+
     os.makedirs(args.outdir, exist_ok=True)
 
     # ---- Test 1: CvM (scipy asymptotic) ----
@@ -329,20 +384,54 @@ def main():
         "Cramér–von Mises: Past vs Present analogue T2m (snapshot, daily max)",
         "=" * 60,
         f"Event:        {args.event}",
-        f"Past n:       {n_past}  (mean {np.mean(past_arr):.2f} °C)",
-        f"Present n:   {n_present}  (mean {np.mean(present_arr):.2f} °C)",
+        f"Past n:       {n_past}  (mean {mu_past:.2f} °C, std {std_past:.2f} °C)",
+        f"Present n:   {n_present}  (mean {mu_present:.2f} °C, std {std_present:.2f} °C)",
         "",
-        "Test 1 — CvM (scipy asymptotic):",
-        f"  Statistic:  {t_cvm:.6f}",
-        f"  p-value:   {p_cvm:.6f}",
-        f"  α=0.05:    {'REJECT H0 (distributions differ)' if reject_cvm else 'Do not reject H0'}",
+        "Target event (same metric as analogues: domain-mean daily max T2m, °C):",
+        f"  snapshot_date:  {snapshot_dt.date()}",
+        f"  T2m at snapshot: {target_t2m:.2f} °C"
+        if np.isfinite(target_t2m)
+        else "  T2m at snapshot: (unavailable — data file missing)",
         "",
-        "Test 2 — Permutation + CvM:",
-        f"  Statistic:  {t_perm:.6f}",
-        f"  p-value:   {p_perm:.6f}  (n_perm={args.nperm})",
-        f"  α=0.05:    {'REJECT H0 (distributions differ)' if reject_perm else 'Do not reject H0'}",
-        "=" * 60,
+        "Gaussian approximation — analogue distributions as N(μ, σ) with μ, σ",
+        "from the sample above; compare target to past vs present:",
     ]
+    if gauss_past is not None and gauss_present is not None:
+        lines.extend(
+            [
+                "  Past:",
+                f"    z = (target − μ_past) / σ_past = {gauss_past['z']:.3f}",
+                f"    CDF percentile (mass below target):     {gauss_past['cdf_percentile']:.1f}%",
+                f"    Upper-tail exceedance P(T ≥ target):    {gauss_past['upper_tail_pct']:.2f}%",
+                "  Present:",
+                f"    z = (target − μ_present) / σ_present = {gauss_present['z']:.3f}",
+                f"    CDF percentile (mass below target):     {gauss_present['cdf_percentile']:.1f}%",
+                f"    Upper-tail exceedance P(T ≥ target):    {gauss_present['upper_tail_pct']:.2f}%",
+                "",
+                "  Interpretation (warm-tail rarity): lower upper-tail % in present than",
+                "  in past suggests the target-like warmth is more common under recent",
+                "  analogue statistics; higher % means rarer under that Gaussian.",
+            ]
+        )
+    elif not np.isfinite(target_t2m):
+        lines.append("  (skipped — target T2m not loaded)")
+    else:
+        lines.append("  (skipped — zero sample std in one group; cannot form Gaussian tail)")
+    lines.extend(
+        [
+            "",
+            "Test 1 — CvM (scipy asymptotic):",
+            f"  Statistic:  {t_cvm:.6f}",
+            f"  p-value:   {p_cvm:.6f}",
+            f"  α=0.05:    {'REJECT H0 (distributions differ)' if reject_cvm else 'Do not reject H0'}",
+            "",
+            "Test 2 — Permutation + CvM:",
+            f"  Statistic:  {t_perm:.6f}",
+            f"  p-value:   {p_perm:.6f}  (n_perm={args.nperm})",
+            f"  α=0.05:    {'REJECT H0 (distributions differ)' if reject_perm else 'Do not reject H0'}",
+            "=" * 60,
+        ]
+    )
     report = "\n".join(lines)
     print(report)
 

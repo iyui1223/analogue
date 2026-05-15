@@ -33,6 +33,7 @@ K2C = 273.15
 DEFAULT_NTOP = 5
 DEFAULT_LEAD_DAYS = 15
 LAND_THRESHOLD = 0.5
+MASK_THRESHOLD = 0.5
 PAST_RANGE = (1948, 1987)
 PRESENT_RANGE = (1988, 2026)
 DEFAULT_LSM_PATH = os.environ.get(
@@ -63,18 +64,63 @@ def get_boxplot_bbox(event_cfg: dict) -> tuple:
     return lat_min, lat_max, lon_min, lon_max
 
 
-def load_analogues(csv_path: str, n_top: int):
+def coord_name(obj, candidates: tuple[str, ...]) -> str:
+    """Return the first matching coordinate/dimension name from candidates."""
+    names = list(obj.coords) + list(obj.dims)
+    for candidate in candidates:
+        if candidate in names:
+            return candidate
+    lower_lookup = {name.lower(): name for name in names}
+    for candidate in candidates:
+        match = lower_lookup.get(candidate.lower())
+        if match is not None:
+            return match
+    raise KeyError(f"Could not find any of {candidates!r} in {names!r}")
+
+
+def get_domain_mask_bbox(mask_path: str, mask_var: str) -> tuple:
+    """Return the smallest 0-360 lat/lon bbox containing non-zero mask cells."""
+    ds = xr.open_dataset(mask_path)
+    try:
+        if mask_var not in ds:
+            raise KeyError(f"Mask variable {mask_var!r} not found in {mask_path}")
+        mask = ds[mask_var]
+        lat_name = coord_name(mask, ("latitude", "lat"))
+        lon_name = coord_name(mask, ("longitude", "lon"))
+        mask_bool = mask > MASK_THRESHOLD
+        valid_lat = mask[lat_name].where(mask_bool.any(dim=lon_name), drop=True)
+        valid_lon = mask[lon_name].where(mask_bool.any(dim=lat_name), drop=True)
+        if valid_lat.size == 0 or valid_lon.size == 0:
+            raise ValueError(f"Mask variable {mask_var!r} has no non-zero cells")
+        lon_vals = np.asarray(valid_lon.values, dtype=np.float64)
+        if np.nanmin(lon_vals) < 0:
+            lon_vals = np.mod(lon_vals, 360.0)
+        return (
+            float(valid_lat.min()),
+            float(valid_lat.max()),
+            float(np.nanmin(lon_vals)),
+            float(np.nanmax(lon_vals)),
+        )
+    finally:
+        ds.close()
+
+
+def load_analogues(csv_path: str, n_top: int, exclude_dates: Optional[set] = None):
     """Return (past_list, present_list) of analogue dicts with date, period, rank.
-    Each list has top n_top analogues by rank."""
+    Each list has top n_top analogues by rank, after excluding any exact dates
+    reserved for the highlighted target event."""
+    exclude_dates = set(exclude_dates or [])
     df = pd.read_csv(csv_path)
     past = []
     present = []
     for _, r in df.iterrows():
         date = datetime(int(r["year"]), int(r["month"]), int(r["day"]))
+        if date.date() in exclude_dates:
+            continue
         entry = {"date": date, "period": r["period"], "rank": int(r["rank"])}
-        if r["period"] == "past" and r["rank"] <= n_top:
+        if r["period"] == "past":
             past.append(entry)
-        elif r["period"] == "present" and r["rank"] <= n_top:
+        elif r["period"] == "present":
             present.append(entry)
     # Sort by rank and take top n_top
     past = sorted(past, key=lambda x: x["rank"])[:n_top]
@@ -130,6 +176,59 @@ def load_land_mask(
     land = (lsm_aligned.values >= LAND_THRESHOLD).squeeze()
     ds.close()
     return land
+
+
+def load_domain_mask(
+    mask_path: str,
+    mask_var: str,
+    lat_min: float,
+    lat_max: float,
+    lon_min: float,
+    lon_max: float,
+    t2m_template: xr.DataArray,
+) -> np.ndarray:
+    """Load a named analysis-domain mask and align it to the T2m subset grid."""
+    ds = xr.open_dataset(mask_path)
+    try:
+        if mask_var not in ds:
+            raise KeyError(f"Mask variable {mask_var!r} not found in {mask_path}")
+        mask = ds[mask_var]
+        mask_lat = coord_name(mask, ("latitude", "lat"))
+        mask_lon = coord_name(mask, ("longitude", "lon"))
+
+        if float(mask[mask_lon].min()) < 0:
+            mask = mask.assign_coords({mask_lon: np.mod(mask[mask_lon], 360.0)})
+            mask = mask.sortby(mask_lon)
+
+        lat_desc = float(mask[mask_lat][0]) > float(mask[mask_lat][-1])
+        lat_slice = slice(lat_max, lat_min) if lat_desc else slice(lat_min, lat_max)
+        mask_sub = mask.sel(
+            {
+                mask_lat: lat_slice,
+                mask_lon: slice(lon_min, lon_max),
+            }
+        )
+
+        tpl = t2m_template
+        tpl_lat = coord_name(tpl, ("latitude", "lat"))
+        tpl_lon = coord_name(tpl, ("longitude", "lon"))
+        if float(tpl[tpl_lon].min()) < 0 and float(mask_sub[mask_lon].min()) >= 0:
+            lon_0360 = tpl[tpl_lon].where(tpl[tpl_lon] >= 0, tpl[tpl_lon] + 360)
+            tpl = tpl.assign_coords({tpl_lon: lon_0360})
+
+        renames = {}
+        if mask_lat != tpl_lat:
+            renames[mask_lat] = tpl_lat
+        if mask_lon != tpl_lon:
+            renames[mask_lon] = tpl_lon
+        if renames:
+            mask_sub = mask_sub.rename(renames)
+
+        mask_aligned = mask_sub.reindex_like(tpl, method="nearest")
+        domain_mask = (mask_aligned.values > MASK_THRESHOLD).squeeze()
+        return domain_mask
+    finally:
+        ds.close()
 
 
 def get_t2m_domain_mean_series(
@@ -241,6 +340,15 @@ def compute_background_series(
     return past_mean, present_mean
 
 
+def safe_filename_part(value: str) -> str:
+    """Return a compact filesystem-safe suffix."""
+    cleaned = "".join(
+        char if char.isalnum() or char in ("-", "_") else "_"
+        for char in value.strip()
+    )
+    return cleaned.strip("_")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="T2m box-and-whisker plot by lead time for analogue members"
@@ -292,7 +400,40 @@ def main():
         default=os.environ.get("ERA5_LSM_PATH", DEFAULT_LSM_PATH),
         help="Path to ERA5 land-sea mask netCDF (default: ERA5_LSM_PATH or built-in)",
     )
+    parser.add_argument(
+        "--domain-mask",
+        default=None,
+        help=(
+            "Optional NetCDF of named analysis-domain masks. When set, the named "
+            "domain mask defines the averaging area instead of the event bbox LSM."
+        ),
+    )
+    parser.add_argument(
+        "--domain-var",
+        default=None,
+        help="Variable name inside --domain-mask to use as the averaging mask.",
+    )
+    parser.add_argument(
+        "--domain-label",
+        default=None,
+        help="Human-readable label for the masked domain in the plot title.",
+    )
+    parser.add_argument(
+        "--output-suffix",
+        default=None,
+        help="Suffix inserted into the PNG filename before _topN.",
+    )
     args = parser.parse_args()
+
+    plt.rcParams.update({
+        'font.size': 14,
+        'axes.titlesize': 14,
+        'axes.labelsize': 14,
+        'xtick.labelsize': 13,
+        'ytick.labelsize': 13,
+        'legend.fontsize': 12,
+        'legend.title_fontsize': 12,
+    })
 
     event_cfg = load_event_config(args.events_yaml, args.event)
     target_start = datetime.strptime(event_cfg["start_date"], "%Y-%m-%d")
@@ -301,10 +442,53 @@ def main():
     if lead_days < 1:
         lead_days = args.lead_days
 
-    lat_min, lat_max, lon_min, lon_max = get_boxplot_bbox(event_cfg)
+    domain_mask_path = args.domain_mask or ""
+    domain_var = args.domain_var or ""
+    use_domain_mask = bool(domain_mask_path and domain_var)
+    if bool(domain_mask_path) != bool(domain_var):
+        raise ValueError("--domain-mask and --domain-var must be provided together")
 
-    land_mask = None
-    if not args.no_land_mask:
+    if use_domain_mask:
+        lat_min, lat_max, lon_min, lon_max = get_domain_mask_bbox(
+            domain_mask_path, domain_var
+        )
+    else:
+        lat_min, lat_max, lon_min, lon_max = get_boxplot_bbox(event_cfg)
+
+    spatial_mask = None
+    if use_domain_mask:
+        path0 = data_slice_file_path(args.data_dir, target_start)
+        if not os.path.isfile(path0):
+            raise FileNotFoundError(path0)
+        with xr.open_dataset(path0) as ds0:
+            t2m0 = ds0["t2m"]
+            lat_slice = slice(lat_max, lat_min) if lat_max > lat_min else slice(lat_min, lat_max)
+            data_lon = t2m0.coords["longitude"]
+            if float(data_lon.min()) < 0:
+                sel_lo = lon_min - 360 if lon_min > 180 else lon_min
+                sel_hi = lon_max - 360 if lon_max > 180 else lon_max
+            else:
+                sel_lo, sel_hi = lon_min, lon_max
+            t2m_sub = t2m0.sel(
+                latitude=lat_slice,
+                longitude=slice(sel_lo, sel_hi),
+            )
+            spatial_mask = load_domain_mask(
+                domain_mask_path,
+                domain_var,
+                lat_min,
+                lat_max,
+                lon_min,
+                lon_max,
+                t2m_sub,
+            )
+        n_mask = int(np.sum(spatial_mask)) if spatial_mask is not None else 0
+        if n_mask == 0:
+            raise ValueError(
+                f"Domain mask {domain_var!r} has no cells on the T2m grid overlap"
+            )
+        print(f"Using domain mask: {domain_var} ({n_mask} grid cells)")
+    elif not args.no_land_mask:
         path0 = data_slice_file_path(args.data_dir, target_start)
         if os.path.isfile(path0):
             with xr.open_dataset(path0) as ds0:
@@ -321,12 +505,12 @@ def main():
                     longitude=slice(sel_lo, sel_hi),
                 )
                 if os.path.isfile(args.lsm_path):
-                    land_mask = load_land_mask(
+                    spatial_mask = load_land_mask(
                         args.lsm_path, lat_min, lat_max, lon_min, lon_max, t2m_sub
                     )
-                    if np.sum(land_mask) == 0:
+                    if np.sum(spatial_mask) == 0:
                         print("No land points in LSM for this bbox; using all points")
-                        land_mask = None
+                        spatial_mask = None
                     else:
                         print("Using land-sea mask: land only")
                 else:
@@ -336,12 +520,17 @@ def main():
     else:
         print("Skipping land mask (--no-land-mask)")
 
-    past_analogues, present_analogues = load_analogues(args.analogues, args.ntop)
+    target_snapshot = datetime.strptime(event_cfg["snapshot_date"], "%Y-%m-%d")
+    past_analogues, present_analogues = load_analogues(
+        args.analogues,
+        args.ntop,
+        exclude_dates={target_snapshot.date()},
+    )
 
     target_series = get_t2m_domain_mean_series(
         target_start, lead_days, args.data_dir,
         lat_min, lat_max, lon_min, lon_max,
-        land_mask,
+        spatial_mask,
     )
 
     past_series = []
@@ -352,7 +541,7 @@ def main():
             s = get_t2m_domain_mean_series(
                 start, lead_days, args.data_dir,
                 lat_min, lat_max, lon_min, lon_max,
-                land_mask,
+                spatial_mask,
             )
             past_series.append(s)
         except FileNotFoundError as e:
@@ -366,7 +555,7 @@ def main():
             s = get_t2m_domain_mean_series(
                 start, lead_days, args.data_dir,
                 lat_min, lat_max, lon_min, lon_max,
-                land_mask,
+                spatial_mask,
             )
             present_series.append(s)
         except FileNotFoundError as e:
@@ -378,7 +567,7 @@ def main():
     past_bg, present_bg = compute_background_series(
         args.data_dir, target_start, lead_days,
         lat_min, lat_max, lon_min, lon_max,
-        land_mask,
+        spatial_mask,
     )
 
     os.makedirs(args.outdir, exist_ok=True)
@@ -460,15 +649,22 @@ def main():
     ax.set_xticks(lead)
     ax.set_xticklabels(date_labels, rotation=45, ha="right")
     ax.set_ylabel("2 m temperature (°C)")
-    region_label = "land " if (land_mask is not None and land_mask.size > 0) else ""
     # Display lon as °W for 0–360 (e.g. 280 → 80°W)
     lon_lo_disp = 360 - lon_min if lon_min > 180 else abs(lon_min)
     lon_hi_disp = 360 - lon_max if lon_max > 180 else abs(lon_max)
+    if args.domain_label:
+        title_domain = f"mean over {args.domain_label}"
+    else:
+        region_label = "land " if (spatial_mask is not None and spatial_mask.size > 0) else ""
+        title_domain = (
+            f"{region_label}mean ({abs(lat_min):.0f}–{abs(lat_max):.0f}°S, "
+            f"{lon_lo_disp:.0f}–{lon_hi_disp:.0f}°W)"
+        )
     ax.set_title(
-        f"T2m {region_label}mean ({abs(lat_min):.0f}–{abs(lat_max):.0f}°S, {lon_lo_disp:.0f}–{lon_hi_disp:.0f}°W) — "
+        f"T2m {title_domain} — "
         f"top {args.ntop} past; top {args.ntop} present"
     )
-    ax.legend(loc="best", fontsize=8)
+    ax.legend(loc="best", fontsize=plt.rcParams["legend.fontsize"])
     # Vertical grid at target event dates; horizontal at 0 and every 2 degrees (°C)
     ax.xaxis.grid(True, alpha=0.3)
     ax.yaxis.grid(True, alpha=0.3)
@@ -481,7 +677,9 @@ def main():
     ax.set_yticks(yticks)
     ax.set_xlim(-0.5, lead_days - 0.5)
     plt.tight_layout()
-    out = os.path.join(args.outdir, f"t2m_boxplot_top{args.ntop}.png")
+    suffix = safe_filename_part(args.output_suffix or "")
+    suffix_part = f"_{suffix}" if suffix else ""
+    out = os.path.join(args.outdir, f"t2m_boxplot{suffix_part}_top{args.ntop}.png")
     plt.savefig(out, dpi=150, bbox_inches="tight")
     plt.close()
     print("Saved", out)
