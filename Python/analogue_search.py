@@ -271,6 +271,59 @@ def compute_euclidean_distances(
     return weighted_diff_sq.sum(dim=['lat', 'lon'])
 
 
+def compute_wasserstein_distances(
+    data: xr.DataArray,
+    reference: xr.DataArray,
+    spatial_weights: Optional[xr.DataArray] = None,
+) -> xr.DataArray:
+    """
+    Compute the 1-D Wasserstein (Earth Mover's) distance between the reference
+    pattern and every time step.
+
+    The spatial field at each time step is treated as a sample of anomaly values
+    over the domain.  The closed-form 1-D W1 distance between two equal-size
+    empirical distributions is:
+
+        W1(u, v) = mean( |sort(u) - sort(v)| )
+
+    This is computed in a single vectorised numpy call: sort the reference once,
+    sort all candidate time steps in one go, then take the mean absolute
+    difference along the spatial axis.
+
+    No spatial weighting is applied: the Wasserstein metric already integrates
+    over the full spatial distribution, making it naturally area-representative
+    as long as the grid is reasonably regular (the same domain restriction used
+    for the Euclidean metric is applied upstream).
+
+    Parameters
+    ----------
+    data : xr.DataArray
+        Anomaly data with dimensions (time, lat, lon).
+    reference : xr.DataArray
+        Reference anomaly pattern with dimensions (lat, lon).
+    spatial_weights : xr.DataArray, optional
+        Accepted for a unified call signature but not used.
+
+    Returns
+    -------
+    xr.DataArray
+        W1 distance for each time step, dimension (time,).
+    """
+    data_np = np.nan_to_num(data.values, nan=0.0)   # (time, lat, lon)
+    ref_np  = np.nan_to_num(reference.values, nan=0.0)  # (lat, lon)
+
+    n_time   = data_np.shape[0]
+    n_spatial = ref_np.size
+
+    data_flat   = data_np.reshape(n_time, n_spatial)   # (time, n_spatial)
+    ref_sorted  = np.sort(ref_np.ravel())              # sort reference once
+
+    data_sorted = np.sort(data_flat, axis=1)           # (time, n_spatial)
+    distances   = np.mean(np.abs(data_sorted - ref_sorted[np.newaxis, :]), axis=1)
+
+    return xr.DataArray(distances, coords={'time': data.time}, dims=['time'])
+
+
 def select_time_separated_analogues(
     df: pd.DataFrame,
     n_analogues: int,
@@ -378,6 +431,7 @@ def find_analogues(
     # Get configuration
     n_analogues = analogue_config.get('n_analogues', 15)
     match_var = analogue_config.get('distance', {}).get('match_variable', 'psurf')
+    similarity_metric = analogue_config.get('similarity_metric', 'rmse').lower()
     
     past_period = analogue_config.get('periods', {}).get('past', {})
     present_period = analogue_config.get('periods', {}).get('present', {})
@@ -425,6 +479,7 @@ def find_analogues(
         if period:
             print(f"Processing ONLY: {period} period")
         print(f"N analogues: {n_analogues}")
+        print(f"Similarity metric: {similarity_metric}")
         print(f"Min time separation: {min_separation}")
     
     # Path to CDO pre-sliced file (same location as cdo_slice.py writes).
@@ -516,8 +571,13 @@ def find_analogues(
         import sys
         sys.stdout.flush()
     
-    distances = compute_euclidean_distances(data_var, reference, spatial_weights)
-    
+    if similarity_metric == 'wasserstein':
+        distances = compute_wasserstein_distances(data_var, reference, spatial_weights)
+    else:
+        if similarity_metric not in ('rmse', 'euclidean'):
+            print(f"[WARN] Unknown similarity_metric '{similarity_metric}'; falling back to 'rmse'.")
+        distances = compute_euclidean_distances(data_var, reference, spatial_weights)
+
     # Trigger computation (if using dask) with progress bar
     if verbose:
         print(f"  Triggering dask computation...")

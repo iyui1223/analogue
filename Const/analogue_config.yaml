@@ -5,8 +5,10 @@
 # Number of analogues to select per target day
 n_analogues: 30
 
-# Similarity metric: rmse, correlation
-similarity_metric: "rmse"
+# Similarity metric for analogue matching
+#   rmse        — latitude-weighted Euclidean (squared) distance (default)
+#   wasserstein — 1-D Wasserstein / Earth Mover's distance (see analogue_config_wasserstein.yaml)
+similarity_metric: "wasserstein"
 
 # Domain for circulation pattern matching
 circulation_domain: "antarctica_peninsula_2020"

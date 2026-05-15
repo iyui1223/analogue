@@ -90,7 +90,7 @@ def get_data_paths(env: Optional[Dict[str, str]] = None) -> Dict[str, Path]:
     
     root = Path(env.get('ROOT_DIR', get_root_dir()))
     data = root / "Data"
-    
+
     return {
         'root': root,
         'data': data,
